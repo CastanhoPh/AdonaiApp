@@ -179,7 +179,12 @@ export function TituloSecao({
           <p className="mt-0.5 text-[13px] leading-5 text-ink-caption">{descricao}</p>
         ) : null}
       </div>
-      {acao}
+      {/*
+        * As ações vêm agrupadas num item só. Sem isto, `acao` com mais de um
+        * botão virava vários itens do flex `justify-between`, e eles apareciam
+        * espalhados entre o título e a borda em vez de juntos à direita.
+        */}
+      {acao ? <div className="flex flex-wrap items-center gap-2">{acao}</div> : null}
     </div>
   );
 }

@@ -5,10 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   ArrowClockwise,
   BellRinging,
-  CheckCircle,
-  Clock,
   Trash,
-  Warning,
 } from "@phosphor-icons/react";
 import {
   buscarPecaAtual,
@@ -34,6 +31,7 @@ import {
   AreaTexto,
   Aviso as Caixa,
   Botao,
+  BotaoIcone,
   Campo,
   Cartao,
   Carregando,
@@ -42,9 +40,9 @@ import {
   Eyebrow,
   Modal,
   Selecao,
-  Status,
   Tag,
   TituloSecao,
+  juntar,
 } from "@/components/ui";
 
 interface Dados {
@@ -348,21 +346,27 @@ function ConteudoAvisos() {
               </Cartao>
 
               <Cartao className="px-4 py-4">
+                {/*
+                  * Ações do cabeçalho em tom discreto. "Apagar todos" chegou a
+                  * ser um botão de perigo aqui e competia com o título da
+                  * seção — uma lista de avisos não deve abrir gritando a ação
+                  * mais destrutiva dela.
+                  */}
                 <TituloSecao
                   titulo="Últimos avisos"
                   acao={
                     <>
-                      <Botao variante="bare" onClick={() => void dados.recarregar()}>
-                        Atualizar
-                      </Botao>
+                      <BotaoIcone rotulo="Atualizar a lista" onClick={() => void dados.recarregar()}>
+                        <ArrowClockwise size={16} />
+                      </BotaoIcone>
                       {avisos.length > 0 ? (
                         <Botao
-                          variante="perigo"
+                          variante="bare"
                           onClick={() => setApagandoTodos(true)}
                           disabled={enviando}
-                          className="gap-1.5"
+                          className="gap-1.5 hover:text-state-negative"
                         >
-                          <Trash size={15} />
+                          <Trash size={14} />
                           Apagar todos
                         </Botao>
                       ) : null}
@@ -374,63 +378,15 @@ function ConteudoAvisos() {
                     Nenhum aviso disparado ainda.
                   </p>
                 ) : (
-                  <ul>
+                  <ul className="-mx-1">
                     {avisos.map((a) => (
-                      <li key={a.id} className="border-b border-stroke-list py-3 last:border-0">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="text-[14px] leading-[21px] font-medium text-ink-heading">
-                            {a.titulo}
-                          </p>
-                          {a.status === "enviado" ? (
-                            <Status tom="positivo">
-                              {a.entregues} {a.entregues === 1 ? "aparelho" : "aparelhos"}
-                            </Status>
-                          ) : a.status === "erro" ? (
-                            <Status tom="negativo">Falhou</Status>
-                          ) : (
-                            <Status tom="aviso">Na fila</Status>
-                          )}
-                        </div>
-                        <p className="mt-0.5 text-[13px] leading-5 text-ink-body">{a.mensagem}</p>
-                        <p className="mt-1 text-[11px] leading-4 text-ink-caption">
-                          {AVISO_ALVO_LABEL[a.alvo]} · {editadoEm(a.criadoEm)}
-                          {a.criadoPor ? ` · ${a.criadoPor}` : ""}
-                        </p>
-                        {a.detalhe ? (
-                          <p className="mt-1 flex items-start gap-1.5 text-[11px] leading-4 text-ink-caption">
-                            {a.status === "erro" ? (
-                              <Warning size={13} className="mt-px shrink-0" />
-                            ) : a.status === "enviado" ? (
-                              <CheckCircle size={13} className="mt-px shrink-0" />
-                            ) : (
-                              <Clock size={13} className="mt-px shrink-0" />
-                            )}
-                            {a.detalhe}
-                          </p>
-                        ) : null}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-3">
-                          {a.status !== "enviado" ? (
-                            <Botao
-                              variante="bare"
-                              onClick={() => void reenviar(a)}
-                              disabled={enviando}
-                              className="gap-1.5"
-                            >
-                              <ArrowClockwise size={14} />
-                              Tentar de novo
-                            </Botao>
-                          ) : null}
-                          <Botao
-                            variante="bare"
-                            onClick={() => setApagando(a)}
-                            disabled={enviando}
-                            className="gap-1.5 text-state-negative"
-                          >
-                            <Trash size={14} />
-                            Apagar
-                          </Botao>
-                        </div>
-                      </li>
+                      <LinhaAviso
+                        key={a.id}
+                        aviso={a}
+                        ocupado={enviando}
+                        onReenviar={() => void reenviar(a)}
+                        onApagar={() => setApagando(a)}
+                      />
                     ))}
                   </ul>
                 )}
@@ -512,5 +468,86 @@ function ConteudoAvisos() {
         </div>
       </Modal>
     </>
+  );
+}
+
+/** Cor e rótulo do estado de entrega, na ordem em que a direção lê. */
+const ESTADO = {
+  enviado: { cor: "bg-state-positive", rotulo: "entregue" },
+  erro: { cor: "bg-state-negative", rotulo: "falhou" },
+  pendente: { cor: "bg-state-warning", rotulo: "na fila" },
+} as const;
+
+/**
+ * Uma linha do histórico de avisos.
+ *
+ * O estado virou um ponto colorido antes do título, em vez de uma etiqueta em
+ * linha própria: com cinco avisos na tela, cinco etiquetas competiam com os
+ * cinco títulos. E as ações são ícones à direita, não botões de texto — a
+ * versão anterior repetia "Tentar de novo" e "Apagar" em vermelho a cada
+ * item, e a lista lia como um alerta em vez de um histórico.
+ */
+function LinhaAviso({
+  aviso,
+  ocupado,
+  onReenviar,
+  onApagar,
+}: {
+  aviso: Aviso;
+  ocupado: boolean;
+  onReenviar: () => void;
+  onApagar: () => void;
+}) {
+  const estado = ESTADO[aviso.status] ?? ESTADO.pendente;
+  const entregue = aviso.status === "enviado";
+
+  return (
+    <li className="flex items-start gap-3 border-b border-stroke-list px-1 py-3 last:border-0">
+      <span
+        aria-hidden
+        className={juntar("mt-[7px] size-2 shrink-0 rounded-full", estado.cor)}
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <p className="text-[14px] leading-[21px] font-medium text-ink-heading">
+            {aviso.titulo}
+          </p>
+          <span className="shrink-0 text-[12px] leading-[18px] text-ink-caption">
+            {entregue
+              ? `${aviso.entregues} ${aviso.entregues === 1 ? "aparelho" : "aparelhos"}`
+              : estado.rotulo}
+          </span>
+        </div>
+
+        <p className="mt-0.5 text-[13px] leading-5 text-ink-body">{aviso.mensagem}</p>
+
+        <p className="mt-1 text-[11px] leading-4 text-ink-caption">
+          {AVISO_ALVO_LABEL[aviso.alvo]} · {editadoEm(aviso.criadoEm)}
+          {aviso.criadoPor ? ` · ${aviso.criadoPor}` : ""}
+        </p>
+
+        {/* Detalhe só quando acrescenta: entrega bem-sucedida já é o "N aparelhos" acima. */}
+        {aviso.detalhe && !entregue ? (
+          <p className="mt-1 text-[11px] leading-4 text-ink-caption">{aviso.detalhe}</p>
+        ) : null}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-0.5">
+        {!entregue ? (
+          <BotaoIcone rotulo="Tentar de novo" onClick={onReenviar} disabled={ocupado}>
+            <ArrowClockwise size={16} />
+          </BotaoIcone>
+        ) : null}
+        <BotaoIcone
+          rotulo="Apagar aviso"
+          onClick={onApagar}
+          disabled={ocupado}
+          className="hover:text-state-negative"
+        >
+          <Trash size={16} />
+        </BotaoIcone>
+      </div>
+    </li>
   );
 }
