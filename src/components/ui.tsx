@@ -127,32 +127,6 @@ export function BotaoIcone({
   );
 }
 
-export function LinkIcone({
-  href,
-  rotulo,
-  children,
-  className,
-}: {
-  href: string;
-  rotulo: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={rotulo}
-      title={rotulo}
-      className={juntar(
-        "grid size-11 shrink-0 place-items-center rounded-[8px] text-ink-caption transition-colors",
-        "hover:bg-surface-hover hover:text-ink-heading sm:size-9",
-        className,
-      )}
-    >
-      {children}
-    </Link>
-  );
-}
 
 /* ----------------------------------------------------------------- blocos */
 
@@ -187,27 +161,6 @@ export function Divisor({ className }: { className?: string }) {
   return <div className={juntar("h-px bg-stroke-frame", className)} />;
 }
 
-export function CabecalhoPagina({
-  titulo,
-  descricao,
-  acao,
-}: {
-  titulo: string;
-  descricao?: string;
-  acao?: ReactNode;
-}) {
-  return (
-    <header className="mb-5 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-[20px] leading-6 font-bold text-ink-heading">{titulo}</h1>
-        {descricao ? (
-          <p className="mt-1 text-[13px] leading-5 text-ink-caption">{descricao}</p>
-        ) : null}
-      </div>
-      {acao ? <div className="flex flex-wrap items-center gap-2">{acao}</div> : null}
-    </header>
-  );
-}
 
 export function TituloSecao({
   titulo,

@@ -53,26 +53,7 @@ export function dataCurta(iso: string): string {
   return `${String(data.getDate()).padStart(2, "0")}/${String(data.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** `2026-03-15` → `Domingo, 15 de março`. */
-export function diaSemanaEData(iso: string): string {
-  const data = parseDate(iso);
-  if (!data) return "Data a definir";
-  const dia = DIAS[data.getDay()];
-  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, ${data.getDate()} de ${MESES[data.getMonth()]}`;
-}
 
-/** Texto relativo curto para o próximo ensaio: "hoje", "amanhã", "em 5 dias". */
-export function distanciaEmDias(iso: string): string {
-  const data = parseDate(iso);
-  if (!data) return "";
-  const hoje = parseDate(hojeISO());
-  if (!hoje) return "";
-  const dias = Math.round((data.getTime() - hoje.getTime()) / 86_400_000);
-  if (dias === 0) return "hoje";
-  if (dias === 1) return "amanhã";
-  if (dias === -1) return "ontem";
-  return dias > 0 ? `em ${dias} dias` : `há ${Math.abs(dias)} dias`;
-}
 
 export function primeiroNome(nome: string): string {
   return (nome ?? "").trim().split(/\s+/)[0] ?? "";
@@ -138,9 +119,6 @@ export function mesCurto(iso: string): string {
 }
 
 /** `2026-09-13` → `13/09`. Usado no cabeçalho do roteiro e nas faixas. */
-export function dataBarra(iso: string): string {
-  return dataCurta(iso);
-}
 
 /** `Sábado` (primeira maiúscula). */
 export function diaSemana(iso: string): string {

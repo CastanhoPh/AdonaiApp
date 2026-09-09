@@ -275,11 +275,6 @@ export interface Rehearsal {
 export const PRESENCA_ESTADOS = ["confirmado", "ausente"] as const;
 export type PresencaEstado = (typeof PRESENCA_ESTADOS)[number];
 
-export const PRESENCA_LABEL: Record<PresencaEstado, string> = {
-  confirmado: "Vou ao ensaio",
-  ausente: "Não vou poder ir",
-};
-
 /**
  * Resposta de presença de uma pessoa a um ensaio.
  * Documento em `rehearsals/{rehearsalId}/presencas/{personId}` — o id é o da

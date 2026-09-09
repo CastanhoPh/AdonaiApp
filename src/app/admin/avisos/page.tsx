@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BellRinging, CheckCircle, Clock, Warning } from "@phosphor-icons/react";
+import { ArrowClockwise, BellRinging, CheckCircle, Clock, Warning } from "@phosphor-icons/react";
 import { buscarPecaAtual, criarAviso, listarAvisos, listarEnsaios } from "@/lib/db";
 import { useAuth } from "@/lib/auth-context";
 import { diaSemanaEHorario, editadoEm, hojeISO } from "@/lib/format";
@@ -97,6 +97,32 @@ function ConteudoAvisos() {
   const [enfileirado, setEnfileirado] = useState(false);
 
   const ensaioEscolhido = futuros.find((e) => e.id === rehearsalId) ?? futuros[0] ?? null;
+
+  /**
+   * Tenta de novo um aviso que não saiu.
+   *
+   * Cria um aviso novo em vez de mexer no antigo: a entrega é disparada pela
+   * *criação* do documento, então reaproveitar o registro parado não acionaria
+   * nada. E o histórico fica honesto — cada tentativa é uma linha, com o
+   * resultado dela.
+   *
+   * Existe porque aviso pode ficar parado: se a função de entrega estiver fora
+   * do ar no instante em que ele é criado, não há nova chance automática. Sem
+   * este botão, a única saída era digitar tudo outra vez.
+   */
+  async function reenviar(a: Aviso) {
+    await enviar(async () => {
+      await criarAviso({
+        titulo: a.titulo,
+        mensagem: a.mensagem,
+        alvo: a.alvo,
+        rehearsalId: a.rehearsalId ?? "",
+        playId: a.playId ?? "",
+        criadoPor: conta?.nome ?? conta?.email ?? "",
+      });
+      await dados.recarregar();
+    });
+  }
 
   async function disparar() {
     setEnfileirado(false);
@@ -326,6 +352,19 @@ function ConteudoAvisos() {
                             )}
                             {a.detalhe}
                           </p>
+                        ) : null}
+                        {a.status !== "enviado" ? (
+                          <div className="mt-1.5">
+                            <Botao
+                              variante="bare"
+                              onClick={() => void reenviar(a)}
+                              disabled={enviando}
+                              className="gap-1.5"
+                            >
+                              <ArrowClockwise size={14} />
+                              Tentar de novo
+                            </Botao>
+                          </div>
                         ) : null}
                       </li>
                     ))}

@@ -3,11 +3,11 @@
 /**
  * Registro do aparelho para receber avisos por push (Firebase Cloud Messaging).
  *
- * O envio é feito fora do navegador — ver `scripts/enviar-avisos.mjs` — porque
- * disparar push exige credencial de servidor, que não pode viver no cliente.
- * Daqui só sai o token do aparelho, guardado em `users/{uid}.tokensFcm`.
+ * O envio é feito no servidor — ver `functions/avisos.js` — porque disparar
+ * push exige credencial que não pode viver no cliente. Daqui só sai o token do
+ * aparelho, guardado em `users/{uid}.tokensFcm`.
  */
-import { getMessaging, getToken, isSupported, onMessage } from "firebase/messaging";
+import { getMessaging, getToken, isSupported } from "firebase/messaging";
 import app from "./firebase";
 import { salvarTokenFcm } from "./db";
 
@@ -56,22 +56,12 @@ export async function registrarAparelho(uid: string): Promise<ResultadoRegistro>
   }
 }
 
-/**
- * Mostra o aviso quando ele chega com o app aberto — nesse caso o navegador
- * entrega a mensagem à página em vez de exibir a notificação sozinho.
+/*
+ * Não existe ouvinte de primeiro plano aqui, e é de propósito.
+ *
+ * O ouvinte do SDK (`onMessage`) serve para o caso em que o service worker do
+ * Firebase engole a notificação quando a página está em foco, deixando a
+ * exibição para a página. Este projeto usa um service worker próprio, com
+ * `push` cru, que chama `showNotification` sempre — em foco ou não. Ligar o
+ * ouvinte também faria o aviso aparecer duas vezes.
  */
-export function ouvirAvisosEmPrimeiroPlano(
-  aoReceber: (titulo: string, mensagem: string) => void,
-): () => void {
-  if (typeof window === "undefined" || !VAPID) return () => {};
-  try {
-    return onMessage(getMessaging(app), (payload) => {
-      const titulo = payload.notification?.title ?? payload.data?.titulo ?? "AdonaiApp";
-      const mensagem = payload.notification?.body ?? payload.data?.mensagem ?? "";
-      aoReceber(titulo, mensagem);
-    });
-  } catch (erro) {
-    console.error("Falha ao ouvir avisos:", erro);
-    return () => {};
-  }
-}
