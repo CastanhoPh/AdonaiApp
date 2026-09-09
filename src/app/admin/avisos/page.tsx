@@ -2,10 +2,24 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowClockwise, BellRinging, CheckCircle, Clock, Warning } from "@phosphor-icons/react";
-import { buscarPecaAtual, criarAviso, listarAvisos, listarEnsaios } from "@/lib/db";
+import {
+  ArrowClockwise,
+  BellRinging,
+  CheckCircle,
+  Clock,
+  Trash,
+  Warning,
+} from "@phosphor-icons/react";
+import {
+  buscarPecaAtual,
+  criarAviso,
+  listarAvisos,
+  listarEnsaios,
+  removerAviso,
+  removerTodosOsAvisos,
+} from "@/lib/db";
 import { useAuth } from "@/lib/auth-context";
-import { diaSemanaEHorario, editadoEm, hojeISO } from "@/lib/format";
+import { diaSemanaEHorario, editadoEm, hojeISO, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import {
   AVISO_ALVOS,
@@ -26,6 +40,7 @@ import {
   Divisor,
   Entrada,
   Eyebrow,
+  Modal,
   Selecao,
   Status,
   Tag,
@@ -72,6 +87,9 @@ export default function Avisos() {
 function ConteudoAvisos() {
   const ensaioDaUrl = useSearchParams().get("ensaio") ?? "";
   const { conta } = useAuth();
+  /** Aviso escolhido para apagar; abre a confirmação. */
+  const [apagando, setApagando] = useState<Aviso | null>(null);
+  const [apagandoTodos, setApagandoTodos] = useState(false);
 
   const dados = useCarregar<Dados>("admin-avisos", async () => {
     const [peca, ensaios, avisos] = await Promise.all([
@@ -122,6 +140,30 @@ function ConteudoAvisos() {
       });
       await dados.recarregar();
     });
+  }
+
+  /*
+   * Apagar não desfaz entrega. Notificação que já saiu está no aparelho de quem
+   * recebeu, e nada no servidor a recolhe — isto limpa o registro na tela. O
+   * texto da confirmação diz isso, para a direção não achar que "apagar"
+   * significa "cancelar o aviso".
+   */
+  async function apagarUm() {
+    const alvo = apagando;
+    if (!alvo) return;
+    const ok = await enviar(async () => {
+      await removerAviso(alvo.id);
+      await dados.recarregar();
+    });
+    if (ok) setApagando(null);
+  }
+
+  async function apagarTodos() {
+    const ok = await enviar(async () => {
+      await removerTodosOsAvisos();
+      await dados.recarregar();
+    });
+    if (ok) setApagandoTodos(false);
   }
 
   async function disparar() {
@@ -309,9 +351,22 @@ function ConteudoAvisos() {
                 <TituloSecao
                   titulo="Últimos avisos"
                   acao={
-                    <Botao variante="bare" onClick={() => void dados.recarregar()}>
-                      Atualizar
-                    </Botao>
+                    <>
+                      <Botao variante="bare" onClick={() => void dados.recarregar()}>
+                        Atualizar
+                      </Botao>
+                      {avisos.length > 0 ? (
+                        <Botao
+                          variante="perigo"
+                          onClick={() => setApagandoTodos(true)}
+                          disabled={enviando}
+                          className="gap-1.5"
+                        >
+                          <Trash size={15} />
+                          Apagar todos
+                        </Botao>
+                      ) : null}
+                    </>
                   }
                 />
                 {avisos.length === 0 ? (
@@ -353,8 +408,8 @@ function ConteudoAvisos() {
                             {a.detalhe}
                           </p>
                         ) : null}
-                        {a.status !== "enviado" ? (
-                          <div className="mt-1.5">
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                          {a.status !== "enviado" ? (
                             <Botao
                               variante="bare"
                               onClick={() => void reenviar(a)}
@@ -364,8 +419,17 @@ function ConteudoAvisos() {
                               <ArrowClockwise size={14} />
                               Tentar de novo
                             </Botao>
-                          </div>
-                        ) : null}
+                          ) : null}
+                          <Botao
+                            variante="bare"
+                            onClick={() => setApagando(a)}
+                            disabled={enviando}
+                            className="gap-1.5 text-state-negative"
+                          >
+                            <Trash size={14} />
+                            Apagar
+                          </Botao>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -387,6 +451,66 @@ function ConteudoAvisos() {
           </div>
         )}
       </CorpoAdmin>
+
+      {/*
+        * Duas confirmações separadas. Apagar um e apagar tudo são ações de peso
+        * diferente, e um diálogo só, com texto genérico, faria "apagar todos"
+        * parecer tão banal quanto apagar uma linha.
+        */}
+      <Modal
+        titulo="Apagar este aviso?"
+        aberto={apagando !== null}
+        onFechar={() => setApagando(null)}
+        rodape={
+          <>
+            <Botao variante="bare" onClick={() => setApagando(null)}>
+              Cancelar
+            </Botao>
+            <Botao variante="perigo" onClick={() => void apagarUm()} disabled={enviando}>
+              {enviando ? "Apagando…" : "Apagar aviso"}
+            </Botao>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-[14px] leading-[21px] text-ink-body">
+            “{apagando?.titulo}” sai do histórico desta tela.
+          </p>
+          {apagando?.status === "enviado" ? (
+            <Caixa tom="aviso">
+              Este aviso já foi entregue em{" "}
+              {pluralizar(apagando.entregues, "aparelho", "aparelhos")}. Apagar não recolhe a
+              notificação de quem recebeu — ela continua no celular da pessoa.
+            </Caixa>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        titulo="Apagar todos os avisos?"
+        aberto={apagandoTodos}
+        onFechar={() => setApagandoTodos(false)}
+        rodape={
+          <>
+            <Botao variante="bare" onClick={() => setApagandoTodos(false)}>
+              Cancelar
+            </Botao>
+            <Botao variante="perigo" onClick={() => void apagarTodos()} disabled={enviando}>
+              {enviando ? "Apagando…" : `Apagar os ${avisos.length}`}
+            </Botao>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-[14px] leading-[21px] text-ink-body">
+            O histórico de avisos fica vazio. Não dá para desfazer.
+          </p>
+          <Caixa tom="aviso">
+            As notificações já entregues continuam nos celulares de quem recebeu — apagar aqui
+            limpa o registro, não recolhe o que saiu.
+          </Caixa>
+        </div>
+      </Modal>
     </>
   );
 }

@@ -805,6 +805,34 @@ export async function listarAvisos(quantos = 20): Promise<Aviso[]> {
   return snap.docs.map((d) => comId<Aviso>(d));
 }
 
+/**
+ * Apaga um aviso do histórico.
+ *
+ * Não desfaz entrega: notificação que já saiu está no aparelho de quem
+ * recebeu, e nada no servidor a recolhe. Isto limpa o registro na tela.
+ *
+ * Aviso automático apagado não volta: o ensaio guarda `lembreteEm`, que é a
+ * trava contra repetição, e ela continua valendo.
+ */
+export async function removerAviso(id: string): Promise<void> {
+  await deleteDoc(doc(db, "avisos", id));
+}
+
+/**
+ * Apaga todos os avisos e devolve quantos foram.
+ *
+ * Em lotes de 400 porque o limite de uma escrita em lote do Firestore é 500.
+ */
+export async function removerTodosOsAvisos(): Promise<number> {
+  const snap = await getDocs(collection(db, "avisos"));
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const lote = writeBatch(db);
+    snap.docs.slice(i, i + 400).forEach((d) => lote.delete(d.ref));
+    await lote.commit();
+  }
+  return snap.size;
+}
+
 /* ---------------------------------------------------------------- presenças */
 
 /** Respostas de presença de um ensaio, na ordem dos nomes. */
