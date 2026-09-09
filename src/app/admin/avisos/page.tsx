@@ -248,14 +248,14 @@ function ConteudoAvisos() {
                 {erro ? <Caixa>{erro}</Caixa> : null}
                 {enfileirado ? (
                   <Caixa tom="positivo">
-                    Aviso registrado na fila. A entrega acontece quando o disparador rodar — veja o
-                    lembrete ao lado.
+                    Aviso enviado. A entrega leva alguns segundos; atualize a lista ao lado para
+                    ver em quantos aparelhos chegou.
                   </Caixa>
                 ) : null}
 
                 <Botao onClick={() => void disparar()} disabled={enviando} className="gap-1.5">
                   <BellRinging size={16} />
-                  {enviando ? "Registrando…" : "Disparar aviso"}
+                  {enviando ? "Enviando…" : "Enviar aviso"}
                 </Botao>
               </div>
             </Cartao>
@@ -266,16 +266,16 @@ function ConteudoAvisos() {
                 <TituloSecao titulo="Como a entrega funciona" />
                 <p className="text-[13px] leading-5 text-ink-body">
                   Mandar notificação exige credencial de servidor, que não pode ficar no navegador.
-                  A direção compõe aqui e o aviso entra na fila; quem entrega é o disparador, no
-                  terminal:
+                  Você compõe aqui e uma função no servidor entrega em poucos segundos, sem mais
+                  nenhum passo manual.
                 </p>
-                <p className="mt-2.5 rounded-[8px] border border-stroke-frame bg-surface-base px-3 py-2 font-mono text-[13px] text-ink-heading">
-                  npm run avisos
+                <p className="mt-2.5 text-[13px] leading-5 text-ink-body">
+                  Só recebe quem autorizou os avisos no próprio Perfil, e apenas nos aparelhos onde
+                  autorizou. Quem não autorizou não entra na conta de entregues.
                 </p>
                 <p className="mt-2.5 text-[12px] leading-[18px] text-ink-caption">
-                  Para o envio virar automático, o projeto precisa do plano Blaze e de uma Cloud
-                  Function disparada na criação do aviso — a lógica do disparador já está pronta
-                  para isso.
+                  Na véspera de cada ensaio, às 7h30, o lembrete “Não esqueça do ensaio!” sai
+                  sozinho para os convocados e aparece na lista ao lado como qualquer outro aviso.
                 </p>
               </Cartao>
 

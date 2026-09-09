@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Cache local do Firebase CLI (.firebaserc é versionado)
 .firebase/
+
+# dependências das Cloud Functions
+functions/node_modules/

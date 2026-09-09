@@ -48,6 +48,8 @@ export interface Aviso {
   detalhe: string;
   /** Quantos aparelhos receberam. */
   entregues: number;
+  /** Criado pelo lembrete diário, não por alguém da direção. */
+  automatico?: boolean;
 }
 
 /*
