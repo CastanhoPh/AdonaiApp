@@ -405,8 +405,6 @@ for (const peca of ACERVO) {
     console.log(`   ${peca.titulo.padEnd(42)} PULA (peça não existe ainda; rode com --aplicar)`);
     continue;
   }
-  const dados = (await ref.get()).data();
-
   // Direção é campo da peça: sobrescrever é seguro e vale sempre.
   const direcao = { diretores: [], vicesDiretores: [] };
   for (const [ator, , , funcao] of peca.papeis) {
