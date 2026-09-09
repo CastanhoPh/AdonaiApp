@@ -19,7 +19,8 @@
     "pecas-antigas": "node scripts/subir-pecas-antigas.mjs",
     "corrigir-pecas": "node scripts/corrigir-pecas.mjs",
     "elenco": "node scripts/subir-elenco.mjs",
-    "corrigir-acervo": "node scripts/corrigir-acervo.mjs"
+    "corrigir-acervo": "node scripts/corrigir-acervo.mjs",
+    "acervo": "node scripts/subir-acervo.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
