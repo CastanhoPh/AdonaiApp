@@ -15,7 +15,17 @@
  */
 import { db } from "./firebase-admin-app.mjs";
 
-const RENOMEAR = [{ de: "Liu Macedo", para: "Leonardo Macedo" }];
+/*
+ * Nomes que entraram errados por causa das listas anteriores, corrigidos pela
+ * lista mais recente. Não é merge: em nenhum dos casos existe ficha com o nome
+ * novo, então renomear basta — o histórico e os personagens continuam
+ * apontando para a mesma ficha.
+ */
+const RENOMEAR = [
+  { de: "Liu Macedo", para: "Leonardo Macedo" },
+  { de: "Weslley Ribeiro", para: "Weslley Ferreira" },
+  { de: "Bia Batista", para: "Beatriz Batista" },
+];
 
 /*
  * Elenco fechado por peça, conforme a lista recebida. Ausente da lista =
