@@ -269,7 +269,7 @@ export default function Painel() {
                   <BotaoLink href={`/admin/pecas/detalhe?id=${peca.id}&aba=elenco`} variante="ghost">
                     Elenco
                   </BotaoLink>
-                  <BotaoLink href={`/admin/pecas/roteiro?id=${peca.id}`} variante="ghost">
+                  <BotaoLink href={`/admin/pecas/detalhe?id=${peca.id}&aba=roteiro`} variante="ghost">
                     Editor de roteiro
                   </BotaoLink>
                 </>

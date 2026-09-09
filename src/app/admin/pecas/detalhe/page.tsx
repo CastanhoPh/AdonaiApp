@@ -26,10 +26,12 @@ import {
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
 import { AbaDados } from "@/components/admin/aba-dados";
 import { AbaElenco } from "@/components/admin/aba-elenco";
+import { AbaEnsaios } from "@/components/admin/aba-ensaios";
+import { AbaRoteiro } from "@/components/admin/aba-roteiro";
 import { AbaPersonagens } from "@/components/admin/aba-personagens";
 import { Abas, Carregando, Tag, Vazio } from "@/components/ui";
 
-type Aba = "dados" | "personagens" | "elenco";
+type Aba = "dados" | "personagens" | "elenco" | "roteiro" | "ensaios";
 
 interface Dados {
   peca: Play | null;
@@ -98,8 +100,8 @@ function ConteudoPeca() {
   // Atalhos do painel apontam direto para uma aba (&aba=elenco); a escolha
   // feita na tela tem prioridade sobre a da URL.
   const abaPedida = consulta.get("aba");
-  const abaDaUrl: Aba =
-    abaPedida === "elenco" || abaPedida === "personagens" ? abaPedida : "dados";
+  const ABAS: Aba[] = ["dados", "personagens", "elenco", "roteiro", "ensaios"];
+  const abaDaUrl: Aba = ABAS.includes(abaPedida as Aba) ? (abaPedida as Aba) : "dados";
   const [abaEscolhida, setAbaEscolhida] = useState<Aba | null>(null);
   const aba = abaEscolhida ?? abaDaUrl;
 
@@ -172,34 +174,22 @@ function ConteudoPeca() {
           <Tag>{falas.length} falas cadastradas</Tag>
         </div>
 
-        {/*
-          * Roteiro e Ensaios entram como atalhos, não como abas: são telas
-          * próprias, com editor e formulários que não caberiam aqui dentro. O
-          * ícone marca a diferença — clicar leva para outro lugar em vez de
-          * trocar o conteúdo abaixo.
-          */}
         <Abas
           className="mb-5"
           abas={[
             { chave: "dados", rotulo: "Dados" },
             { chave: "personagens", rotulo: "Personagens", contagem: personagens.length },
             { chave: "elenco", rotulo: "Elenco", contagem: escalados },
-          ]}
-          ativa={aba}
-          onTrocar={setAbaEscolhida}
-          atalhos={[
+            { chave: "roteiro", rotulo: "Editor de roteiro", icone: <Scroll size={15} /> },
             {
-              href: `/admin/pecas/roteiro?id=${peca.id}`,
-              rotulo: "Editor de roteiro",
-              icone: <Scroll size={15} />,
-            },
-            {
-              href: `/admin/ensaios?peca=${peca.id}`,
+              chave: "ensaios",
               rotulo: "Ensaios",
               contagem: dados.dados?.ensaios,
               icone: <CalendarDots size={15} />,
             },
           ]}
+          ativa={aba}
+          onTrocar={setAbaEscolhida}
         />
 
         {aba === "dados" ? (
@@ -221,6 +211,14 @@ function ConteudoPeca() {
             onAtualizar={dados.recarregar}
           />
         ) : null}
+
+        {/*
+          * Roteiro e Ensaios montam apenas quando escolhidos: cada um carrega
+          * as próprias consultas (falas do roteiro, ensaios da peça), e montar
+          * os cinco de uma vez faria a aba Dados pagar por tudo.
+          */}
+        {aba === "roteiro" ? <AbaRoteiro playId={peca.id} /> : null}
+        {aba === "ensaios" ? <AbaEnsaios playId={peca.id} /> : null}
 
         {aba === "elenco" ? (
           <AbaElenco
