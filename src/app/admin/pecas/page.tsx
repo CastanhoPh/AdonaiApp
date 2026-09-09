@@ -3,9 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowUpRight, ClockCounterClockwise, PuzzlePiece, Plus } from "@phosphor-icons/react";
+import { ClockCounterClockwise, Plus } from "@phosphor-icons/react";
 import { criarPeca, definirPecaAtual, listarPecas } from "@/lib/db";
-import { dataLonga, hojeISO } from "@/lib/format";
+import { ano, dataCurta, dataLonga, hojeISO, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import { PLAY_STATUS, PLAY_STATUS_LABEL, type Play, type PlayStatus } from "@/lib/types";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin } from "@/components/shell";
@@ -19,6 +19,7 @@ import {
   Cartao,
   Carregando,
   Entrada,
+  Eyebrow,
   Modal,
   Selecao,
   Status,
@@ -84,8 +85,26 @@ function ConteudoPecas() {
   const [form, setForm] = useState(pecaVazia());
 
   const lista = pecas.dados ?? [];
-  const ativas = lista.filter((p) => p.status !== "arquivada");
-  const arquivadas = lista.filter((p) => p.status === "arquivada");
+
+  /*
+   * Duas leituras diferentes, duas apresentações.
+   *
+   * Peça em produção é operacional: quem abre esta tela quer agir nela, então
+   * vem em cartão, com capa e com o botão de definir como atual. Acervo é
+   * consulta: dezessete cartões iguais viravam rolagem sem fim, e o que se
+   * procura ali é "que peça foi em tal ano" — por isso linhas compactas
+   * agrupadas por ano.
+   */
+  const emProducao = lista.filter((p) => p.status !== "concluida" && p.status !== "arquivada");
+  const acervo = lista.filter((p) => p.status === "concluida" || p.status === "arquivada");
+
+  const porAno = Array.from(
+    acervo.reduce((mapa, peca) => {
+      const chave = ano(peca.dataApresentacao);
+      mapa.set(chave, [...(mapa.get(chave) ?? []), peca]);
+      return mapa;
+    }, new Map<string, Play[]>()),
+  ).sort((a, b) => b[0].localeCompare(a[0]));
 
   function abrir() {
     setForm(pecaVazia());
@@ -157,33 +176,42 @@ function ConteudoPecas() {
                 acao={<Botao onClick={abrir}>Nova peça</Botao>}
               />
             ) : (
-              <ul className="space-y-3">
-                {ativas.map((peca) => (
-                  <ItemPeca
-                    key={peca.id}
-                    peca={peca}
-                    enviando={enviando}
-                    onMarcarAtual={() => void marcarComoAtual(peca.id)}
-                  />
-                ))}
-              </ul>
-            )}
+              <>
+                {emProducao.length > 0 ? (
+                  <section>
+                    <Eyebrow>Em produção</Eyebrow>
+                    <ul className="mt-2 space-y-3">
+                      {emProducao.map((peca) => (
+                        <CartaoDeProducao
+                          key={peca.id}
+                          peca={peca}
+                          enviando={enviando}
+                          onMarcarAtual={() => void marcarComoAtual(peca.id)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
 
-            {arquivadas.length > 0 ? (
-              <section className="pt-2">
-                <p className="eyebrow mb-3 text-ink-caption">Arquivadas</p>
-                <ul className="space-y-3">
-                  {arquivadas.map((peca) => (
-                    <ItemPeca
-                      key={peca.id}
-                      peca={peca}
-                      enviando={enviando}
-                      onMarcarAtual={() => void marcarComoAtual(peca.id)}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ) : null}
+                {porAno.map(([anoDaPeca, doAno]) => (
+                  <section key={anoDaPeca}>
+                    <div className="mb-1 flex items-baseline justify-between gap-3 border-b border-stroke-frame pb-1.5">
+                      <p className="fonte-num text-[15px] leading-6 font-bold text-ink-heading">
+                        {anoDaPeca}
+                      </p>
+                      <span className="text-[12px] leading-[18px] text-ink-caption">
+                        {pluralizar(doAno.length, "peça", "peças")}
+                      </span>
+                    </div>
+                    <ul>
+                      {doAno.map((peca) => (
+                        <LinhaDoAcervo key={peca.id} peca={peca} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </>
+            )}
           </div>
         )}
       </CorpoAdmin>
@@ -201,7 +229,13 @@ function ConteudoPecas() {
   );
 }
 
-function ItemPeca({
+/**
+ * Peça em produção: cartão com capa e a ação de definir como atual.
+ *
+ * Mantém a apresentação em cartão porque aqui se age, não se consulta — e
+ * porque em produção há sempre uma ou duas peças, não dezessete.
+ */
+function CartaoDeProducao({
   peca,
   enviando,
   onMarcarAtual,
@@ -214,65 +248,54 @@ function ItemPeca({
     <li>
       <Cartao className={juntar("px-4 py-4", peca.atual && "border-brand")}>
         <div className="flex items-start gap-3.5">
+          {/*
+            * Sem capa, sem moldura vazia: o quadrado com ícone de peça
+            * ocupava 64px para não dizer nada, e a maioria das peças não tem
+            * capa cadastrada.
+            */}
           {peca.capaUrl ? (
-            // Capa cadastrada pela direção (Storage ou URL externa).
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={peca.capaUrl}
               alt={peca.titulo}
               className="size-16 shrink-0 rounded-[8px] border border-stroke-frame object-cover"
             />
-          ) : (
-            <span className="grid size-16 shrink-0 place-items-center rounded-[8px] border border-stroke-frame bg-surface-raised text-ink-caption">
-              <PuzzlePiece size={26} />
-            </span>
-          )}
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <Link
                 href={`/admin/pecas/detalhe?id=${peca.id}`}
-                className="inline-flex items-center gap-1.5 text-[15px] leading-[22px] font-bold text-ink-heading hover:text-brand-strong"
+                className="text-[15px] leading-[22px] font-bold text-ink-heading hover:text-brand-strong"
               >
                 {peca.titulo}
-                <ArrowUpRight size={14} />
               </Link>
               {peca.atual ? <Tag tom="areia">Peça atual</Tag> : null}
             </div>
 
-            {peca.descricao ? (
-              <p className="mt-1 line-clamp-2 text-[13px] leading-5 text-ink-caption">
-                {peca.descricao}
-              </p>
-            ) : null}
+            <p className="mt-0.5 text-[13px] leading-5 text-ink-caption">
+              {[
+                peca.nomeEvento || null,
+                peca.dataApresentacao ? dataLonga(peca.dataApresentacao) : null,
+                peca.local || null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "Sem data definida"}
+            </p>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
               <Status tom={TOM_STATUS[peca.status]}>{PLAY_STATUS_LABEL[peca.status]}</Status>
-              {/* Responde "ainda dá para entrar nessa peça?", que o status não responde. */}
               <Tag tom={peca.elencoFechado ? "neutro" : "areia"}>
                 {peca.elencoFechado ? "Elenco fechado" : "Elenco em aberto"}
               </Tag>
-              {peca.dataApresentacao ? (
-                <span className="text-[12px] leading-[18px] text-ink-caption">
-                  {dataLonga(peca.dataApresentacao)}
-                  {peca.local ? ` · ${peca.local}` : ""}
-                </span>
+              {peca.roteiroPublicado ? (
+                <Tag tom="positivo">Roteiro v{peca.roteiroVersao}</Tag>
+              ) : peca.roteiroEditadoEm ? (
+                <Tag>Roteiro em edição</Tag>
               ) : null}
-              {/*
-                * "Em edição" só cabe quando alguém mexeu no roteiro. Peça do
-                * acervo nunca teve texto no app, e dizer que está em edição
-                * sugere trabalho em andamento que não existe.
-                */}
-              <Tag tom={peca.roteiroPublicado ? "positivo" : "neutro"}>
-                {peca.roteiroPublicado
-                  ? `Roteiro v${peca.roteiroVersao}`
-                  : peca.roteiroEditadoEm
-                    ? "Roteiro em edição"
-                    : "Sem roteiro"}
-              </Tag>
             </div>
 
-            {!peca.atual && peca.status !== "concluida" && peca.status !== "arquivada" ? (
+            {!peca.atual ? (
               <div className="mt-3">
                 <Botao variante="ghost" onClick={onMarcarAtual} disabled={enviando}>
                   Definir como peça atual
@@ -282,6 +305,41 @@ function ItemPeca({
           </div>
         </div>
       </Cartao>
+    </li>
+  );
+}
+
+/**
+ * Uma peça do acervo, em linha.
+ *
+ * Só o que distingue uma peça da outra: dia, título e evento. Status ficou de
+ * fora porque no acervo é "Concluída" em todas, e "Sem roteiro" também — repetir
+ * dezessete vezes o que não varia é ruído, não informação. Elenco em aberto
+ * aparece porque é o que ainda pede trabalho; fechado fica implícito.
+ */
+function LinhaDoAcervo({ peca }: { peca: Play }) {
+  return (
+    <li className="border-b border-stroke-list last:border-0">
+      <Link
+        href={`/admin/pecas/detalhe?id=${peca.id}`}
+        className="-mx-2 flex items-baseline gap-3 rounded-[8px] px-2 py-2.5 transition-colors hover:bg-surface-hover"
+      >
+        <span className="fonte-num w-11 shrink-0 text-[12px] leading-5 text-ink-caption">
+          {peca.dataApresentacao ? dataCurta(peca.dataApresentacao) : "--/--"}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-5 font-medium text-ink-heading">
+          {peca.titulo}
+        </span>
+        <span className="hidden min-w-0 max-w-[42%] shrink truncate text-[12px] leading-5 text-ink-caption min-[560px]:block">
+          {peca.nomeEvento ?? ""}
+        </span>
+        {!peca.elencoFechado ? (
+          <Tag tom="areia" className="shrink-0">
+            Elenco em aberto
+          </Tag>
+        ) : null}
+        {peca.status === "arquivada" ? <Tag className="shrink-0">Arquivada</Tag> : null}
+      </Link>
     </li>
   );
 }
