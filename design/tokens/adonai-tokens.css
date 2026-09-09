@@ -1,0 +1,53 @@
+/* Aliança Adonai — design tokens (AdonaiApp)
+   Cole em app/globals.css (ou styles/tokens.css) e importe uma vez. */
+
+:root {
+  /* Superfícies (dark-first) */
+  --surface-base: #062430;      /* fundo da tela */
+  --surface-lower: #08303F;     /* barras, header, tab bar */
+  --surface-card: #0A3648;      /* cards, listas */
+  --surface-raised: #0B3C51;    /* heros, destaques, ícone do app */
+  --canvas-deep: #041B24;       /* fundo fora do app (board/desktop) */
+
+  /* Traços (hairlines, nunca sombra) */
+  --stroke-frame: #1B5470;
+  --stroke-list: #103F53;
+
+  /* Texto */
+  --text-heading: #E5E2D0;
+  --text-body: #C6D2D6;
+  --text-caption: #93A9B3;
+  --text-disabled: #5E7681;
+
+  /* Marca */
+  --brand: #A28F6A;             /* areia — acento, use em fill/borda e texto ≥14px */
+  --brand-strong: #B39E77;      /* hover + texto pequeno (11-12px) */
+  --brand-soft: #C9BC9B;        /* rótulos 10px sobre navio/faixa */
+  --brand-ink: #062430;         /* tinta sobre preenchimento areia */
+  --brand-secondary: #3F708C;   /* azul médio: informativo, tags */
+
+  /* Feedback */
+  --positive: #369365;
+  --warning: #DFA345;
+  --negative: #C0372B;
+  --info: #3F708C;
+
+  /* Destaque de fala do usuário no roteiro */
+  --speech-bg: rgba(162, 143, 106, 0.18);
+  --speech-bar: #A28F6A;
+  --speech-label: #C9BC9B;
+
+  /* Raios */
+  --radius-sm: 8px;   /* inputs, botões, linhas do editor */
+  --radius-md: 16px;  /* cards */
+  --radius-pill: 999px;
+
+  /* Tipografia */
+  --font-sans: "DM Sans", system-ui, sans-serif;   /* interface e leitura */
+  --font-brand: "SUSE", var(--font-sans);          /* eyebrows/wordmark, uppercase, tracking .32em */
+  --font-num: "Manrope", var(--font-sans);         /* números e contadores */
+}
+
+/* Espaçamento: 4 / 8 / 12 / 16 / 20 / 24 / 32
+   Tipo:       11 / 12 / 13 / 14 / 15 / 16 / 20 / 24 / 32 / 40 px
+   Alturas de linha fixas: 18 / 21 / 24 / 28 / 38 / 48 px */

@@ -1,0 +1,27 @@
+/* Tailwind v4 — cole em app/globals.css depois de @import "tailwindcss"; */
+@theme {
+  --color-surface-base: #062430;
+  --color-surface-lower: #08303F;
+  --color-surface-card: #0A3648;
+  --color-surface-raised: #0B3C51;
+  --color-surface-deep: #041B24;
+  --color-stroke-frame: #1B5470;
+  --color-stroke-list: #103F53;
+  --color-ink-heading: #E5E2D0;
+  --color-ink-body: #C6D2D6;
+  --color-ink-caption: #93A9B3;
+  --color-ink-disabled: #5E7681;
+  --color-brand: #A28F6A;
+  --color-brand-strong: #B39E77;
+  --color-brand-soft: #C9BC9B;
+  --color-brand-ink: #062430;
+  --color-brand-secondary: #3F708C;
+  --color-state-positive: #369365;
+  --color-state-warning: #DFA345;
+  --color-state-negative: #C0372B;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-brand: "SUSE", "DM Sans", sans-serif;
+  --font-num: "Manrope", "DM Sans", sans-serif;
+}

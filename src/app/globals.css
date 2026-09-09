@@ -1,26 +1,198 @@
 @import "tailwindcss";
 
+/*
+ * Aliança Adonai — tokens do handoff de design (design/tokens/tailwind.v4.css).
+ * Interface dark-first, herdada da marca monocromática do Aliança: superfícies
+ * navio, texto creme e areia como único acento.
+ *
+ * Regras não negociáveis do visual:
+ *  - separação por hairline de 1px (stroke-frame), nunca sombra em card;
+ *  - card raio 16, input e botão raio 8;
+ *  - areia só como acento; preenchimento areia sempre com tinta escura;
+ *  - texto de 10-12px nunca em areia pura — usa brand-strong ou brand-soft;
+ *  - sem emoji; ícones Phosphor, peso regular, currentColor.
+ */
+@theme {
+  /* Superfícies */
+  --color-surface-base: #062430;
+  --color-surface-lower: #08303f;
+  --color-surface-card: #0a3648;
+  --color-surface-raised: #0b3c51;
+  --color-surface-deep: #041b24;
+  /* Clareamento de hover, definido no handoff */
+  --color-surface-hover: #10506b;
+  --color-surface-active: #0e4559;
+
+  /* Traços */
+  --color-stroke-frame: #1b5470;
+  --color-stroke-list: #103f53;
+
+  /* Texto */
+  --color-ink-heading: #e5e2d0;
+  --color-ink-body: #c6d2d6;
+  --color-ink-caption: #93a9b3;
+  --color-ink-disabled: #5e7681;
+  /* Item inativo da tab bar */
+  --color-ink-tab: #8fa5af;
+
+  /* Marca */
+  --color-brand: #a28f6a;
+  --color-brand-strong: #b39e77;
+  --color-brand-soft: #c9bc9b;
+  --color-brand-ink: #062430;
+  --color-brand-secondary: #3f708c;
+  /* Tag areia preenchida: 5,4:1 com texto branco */
+  --color-brand-tag: #79684a;
+
+  /* Feedback */
+  --color-state-positive: #369365;
+  --color-state-warning: #dfa345;
+  --color-state-negative: #c0372b;
+
+  /* Destaque da fala do usuário no roteiro */
+  --color-speech-label: #cfc3a5;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  --font-brand: var(--font-suse), var(--font-dm-sans), sans-serif;
+  --font-num: var(--font-manrope), var(--font-dm-sans), sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  /* Fundo da fala do usuário: areia a 18%. */
+  --speech-bg: rgba(162, 143, 106, 0.18);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html {
+  -webkit-text-size-adjust: 100%;
+  background-color: var(--color-surface-base);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * Zoom desligado no app. Além de `maximumScale`/`userScalable` no viewport:
+ *  - `touch-action: manipulation` corta o zoom por toque duplo;
+ *  - em telas de toque os campos vão a 16px, porque abaixo disso o Safari no
+ *    iOS amplia a página sozinho ao focar um input (e depois não volta).
+ * O Safari mantém a pinça por decisão de acessibilidade da Apple, e o roteiro
+ * tem controle próprio de tamanho de letra para quem precisa ampliar.
+ */
+body {
+  background-color: var(--color-surface-base);
+  color: var(--color-ink-body);
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Eyebrow: rótulo em SUSE, caixa alta, tracking largo. */
+.eyebrow {
+  font-family: var(--font-brand);
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+/* Nome de personagem antes da fala: mesmo tratamento, tracking menor. */
+.eyebrow-fala {
+  font-family: var(--font-brand);
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.fonte-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Área segura de aparelhos com barra inferior. */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.nav-safe {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* Movimento: 120-280ms, sem bounce. */
+* {
+  --transicao: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Anel de foco padrão do handoff. */
+:focus-visible {
+  outline: 2px solid #7fa8c8;
+  outline-offset: 2px;
+}
+
+/* Tamanho de fonte do roteiro, controlado pelo leitor. */
+.roteiro-escala {
+  font-size: var(--roteiro-fonte, 1rem);
+}
+
+/* Esconde a barra de rolagem nas faixas horizontais de navegação. */
+.sem-barra {
+  scrollbar-width: none;
+}
+.sem-barra::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Espera antes de mostrar esqueleto de carregamento.
+ *
+ * A maioria das telas fica pronta em menos de 250ms, e o esqueleto aparecia e
+ * sumia nesse intervalo — um piscar de três quadrados cinza que parecia uma
+ * "tela estranha" no meio da navegação. Com o atraso, carregamento curto não
+ * mostra nada e a tela anterior simplesmente dá lugar à nova; só espera de
+ * verdade ganha esqueleto.
+ *
+ * Feito em CSS de propósito: um temporizador em JavaScript custaria estado e
+ * um efeito por tela para o mesmo resultado.
+ */
+@keyframes surgir-esqueleto {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.esqueleto-atrasado {
+  animation: surgir-esqueleto 120ms ease-out 250ms both;
+}
+
+/* Quem pediu menos animação vê o esqueleto na hora, sem transição. */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto-atrasado {
+    animation: none;
+  }
+}
+
+@media print {
+  .sem-impressao {
+    display: none !important;
+  }
 }
