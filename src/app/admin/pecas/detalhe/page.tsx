@@ -170,7 +170,9 @@ function ConteudoPeca() {
               ? `Roteiro v${peca.roteiroVersao} publicado${
                   peca.roteiroPublicadoEm ? ` em ${dataLonga(peca.roteiroPublicadoEm)}` : ""
                 }`
-              : "Roteiro em edição"}
+              : peca.roteiroEditadoEm
+                ? "Roteiro em edição"
+                : "Sem roteiro"}
           </Tag>
           <Tag>{falas.length} falas cadastradas</Tag>
         </div>

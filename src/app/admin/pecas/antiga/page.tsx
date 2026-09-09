@@ -77,11 +77,6 @@ export default function PecaAntiga() {
       definirErro("Esta data é no futuro. Para peça que ainda vai acontecer, use “Nova peça”.");
       return;
     }
-    if (preenchidos.length === 0) {
-      definirErro("Cadastre ao menos um personagem.");
-      return;
-    }
-
     const ok = await enviar(async () => {
       const r = await registrarPecaAntiga({
         titulo: titulo.trim(),
@@ -144,7 +139,7 @@ export default function PecaAntiga() {
                 </h2>
                 <p className="mt-1 text-[13px] leading-5 text-ink-body">
                   {registrada.participacoes === 0
-                    ? "Nenhum personagem tinha alguém ligado, então nada foi para o histórico de ninguém. Abra a peça para escalar quem atuou."
+                    ? "Sem elenco registrado ainda, então nada foi para o histórico de ninguém. Abra a peça quando quiser cadastrar os personagens e quem atuou."
                     : registrada.participacoes === 1
                       ? "1 participação registrada. Já aparece no histórico da pessoa."
                       : `${registrada.participacoes} participações registradas. Já aparecem no histórico de cada pessoa.`}
@@ -228,9 +223,14 @@ export default function PecaAntiga() {
           </Cartao>
 
           <Cartao className="px-4 py-4">
+            {/*
+              * Nada aqui é exigido: registrar nome, evento e data já tem valor,
+              * e o elenco de peça de anos atrás costuma ser lembrado depois. A
+              * peça fica na lista e recebe os personagens quando der.
+              */}
             <TituloSecao
               titulo="Personagens"
-              descricao="Quem atuou em cada papel. Deixe a pessoa em branco se não lembrar — o personagem fica registrado, mas não entra no histórico de ninguém."
+              descricao="Opcional. Quem atuou em cada papel — deixe a pessoa em branco se não lembrar, ou deixe tudo vazio e preencha depois, na peça."
             />
 
             <ul className="space-y-3">

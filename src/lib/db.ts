@@ -284,9 +284,28 @@ export async function criarCaracteristica(nome: string, ordem: number): Promise<
 
 /* ------------------------------------------------------------------- peças */
 
+/**
+ * Peças da mais recente para a mais antiga, pela data de apresentação.
+ *
+ * Antes vinham por data de cadastro, o que só coincide com a ordem real
+ * enquanto se cadastra na sequência em que as peças acontecem. Ao subir o
+ * acervo de uma vez, as treze entraram no mesmo instante e a lista saiu
+ * embaralhada — 2024 depois de 2026.
+ *
+ * A ordenação é feita aqui e não no Firestore para não exigir índice composto
+ * nem excluir peça sem data: `orderBy` no servidor descarta documento sem o
+ * campo, e peça em planejamento pode não ter data ainda.
+ */
 export async function listarPecas(): Promise<Play[]> {
-  const snap = await getDocs(query(collection(db, "plays"), orderBy("criadoEm", "desc")));
-  return snap.docs.map((d) => comId<Play>(d));
+  const snap = await getDocs(collection(db, "plays"));
+  const pecas = snap.docs.map((d) => comId<Play>(d));
+  return pecas.sort((a, b) => {
+    // Sem data vai para o topo: é peça sendo montada agora.
+    const x = a.dataApresentacao || "9999-12-31";
+    const y = b.dataApresentacao || "9999-12-31";
+    if (x !== y) return y.localeCompare(x);
+    return (b.criadoEm ?? "").localeCompare(a.criadoEm ?? "");
+  });
 }
 
 export async function buscarPeca(id: string): Promise<Play | null> {
@@ -413,8 +432,9 @@ export interface PapelAntigo {
  * peça nasce concluída, com os personagens e as participações no mesmo lote —
  * ou tudo entra, ou nada entra, e não fica peça pela metade no histórico.
  *
- * Roteiro não é pedido de propósito: peça antiga raramente tem o texto à mão, e
- * exigi-lo impediria de registrar o que se lembra.
+ * Roteiro e elenco não são exigidos: peça antiga raramente tem o texto à mão, e
+ * o elenco de anos atrás costuma ser lembrado depois. Nome, evento e data já
+ * têm valor sozinhos — a peça fica registrada e recebe o resto quando der.
  */
 export async function registrarPecaAntiga(dados: {
   titulo: string;

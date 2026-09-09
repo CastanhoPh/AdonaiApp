@@ -15,7 +15,8 @@
     "avisos": "node scripts/enviar-avisos.mjs",
     "segmentos": "node scripts/corrigir-segmentos.mjs",
     "claims": "node scripts/sincronizar-claims.mjs",
-    "nomes": "node scripts/alinhar-nomes.mjs"
+    "nomes": "node scripts/alinhar-nomes.mjs",
+    "pecas-antigas": "node scripts/subir-pecas-antigas.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

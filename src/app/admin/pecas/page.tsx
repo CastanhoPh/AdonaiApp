@@ -254,8 +254,17 @@ function ItemPeca({
                   {peca.local ? ` · ${peca.local}` : ""}
                 </span>
               ) : null}
+              {/*
+                * "Em edição" só cabe quando alguém mexeu no roteiro. Peça do
+                * acervo nunca teve texto no app, e dizer que está em edição
+                * sugere trabalho em andamento que não existe.
+                */}
               <Tag tom={peca.roteiroPublicado ? "positivo" : "neutro"}>
-                {peca.roteiroPublicado ? `Roteiro v${peca.roteiroVersao}` : "Roteiro em edição"}
+                {peca.roteiroPublicado
+                  ? `Roteiro v${peca.roteiroVersao}`
+                  : peca.roteiroEditadoEm
+                    ? "Roteiro em edição"
+                    : "Sem roteiro"}
               </Tag>
             </div>
 
