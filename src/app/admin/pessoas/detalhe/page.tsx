@@ -219,25 +219,30 @@ function ConteudoPerfil() {
   ).filter(Boolean);
 
   /*
-   * Personagens agrupados por tipo de papel.
+   * Personagens agrupados por tipo de papel, com quantas vezes cada um.
    *
-   * A lista corrida de nomes dizia quantos personagens a pessoa fez, mas não
-   * o que ela costuma fazer — que é a pergunta de quem vai escalar. Doze nomes
-   * misturados esconde a diferença entre quem fez oito protagonistas e quem fez
-   * oito figurantes.
+   * A lista corrida de nomes dizia quantos personagens a pessoa fez, mas não o
+   * que ela costuma fazer — que é a pergunta de quem vai escalar. E repetição
+   * conta: fazer o mesmo protagonista em três peças é mais experiência do que
+   * fazer um, e a versão anterior mostrava os dois casos igual.
    *
-   * Na ordem de ROLE_TYPES, que vai do papel de maior peso ao de menor. Nome
-   * repetido em peças diferentes conta uma vez por grupo: "Paçoca" foi
-   * protagonista em três peças e é um personagem, não três.
+   * A contagem do grupo é de participações, não de nomes, então a soma dos
+   * grupos fecha com o total de peças. O "×3" ao lado do nome mostra de onde
+   * vem a diferença.
+   *
+   * Na ordem de ROLE_TYPES, que vai do papel de maior peso ao de menor.
    */
-  const porTipoDePapel = ROLE_TYPES.map((tipo) => ({
-    tipo,
-    nomes: Array.from(
-      new Set(
-        participacoes.filter((x) => x.tipoPapel === tipo).map((x) => x.characterNome),
-      ),
-    ).filter(Boolean),
-  })).filter((grupo) => grupo.nomes.length > 0);
+  const porTipoDePapel = ROLE_TYPES.map((tipo) => {
+    const doTipo = participacoes.filter((x) => x.tipoPapel === tipo && x.characterNome);
+    const vezes = new Map<string, number>();
+    doTipo.forEach((x) => vezes.set(x.characterNome, (vezes.get(x.characterNome) ?? 0) + 1));
+    return {
+      tipo,
+      total: doTipo.length,
+      // Mais repetido primeiro: é o papel que a pessoa mais fez naquele tipo.
+      papeis: [...vezes].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    };
+  }).filter((grupo) => grupo.total > 0);
 
   return (
     <>
@@ -397,7 +402,12 @@ function ConteudoPerfil() {
                   </p>
                 </div>
                 <div>
-                  <Eyebrow>Personagens</Eyebrow>
+                  {/*
+                    * "diferentes" no rótulo porque os grupos abaixo contam
+                    * participações e somam 16, não 11 — sem a palavra, os dois
+                    * números pareceriam contradizer um ao outro.
+                    */}
+                  <Eyebrow>Personagens diferentes</Eyebrow>
                   <p className="fonte-num mt-1 text-[32px] leading-[38px] font-bold text-ink-heading">
                     {personagensAnteriores.length}
                   </p>
@@ -409,15 +419,23 @@ function ConteudoPerfil() {
                     <div key={grupo.tipo}>
                       <p className="mb-1.5 flex items-baseline gap-1.5 text-[12px] leading-[18px] text-ink-caption">
                         {ROLE_TYPE_LABEL[grupo.tipo]}
-                        <span className="fonte-num text-ink-body">{grupo.nomes.length}</span>
+                        <span className="fonte-num text-ink-body">{grupo.total}</span>
+                        {grupo.papeis.length !== grupo.total ? (
+                          <span>
+                            em {pluralizar(grupo.papeis.length, "personagem", "personagens")}
+                          </span>
+                        ) : null}
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {grupo.nomes.map((nome) => (
+                        {grupo.papeis.map(([nome, quantas]) => (
                           <Tag
                             key={nome}
                             tom={grupo.tipo === "protagonista" ? "areia" : "neutro"}
                           >
                             {nome}
+                            {quantas > 1 ? (
+                              <span className="fonte-num ml-1 opacity-70">×{quantas}</span>
+                            ) : null}
                           </Tag>
                         ))}
                       </div>
