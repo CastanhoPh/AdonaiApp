@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle } from "@phosphor-icons/react";
+import { ArrowUpRight, CheckCircle, MagnifyingGlass } from "@phosphor-icons/react";
 import { atualizarPersonagem, escalarPessoa } from "@/lib/db";
-import { nomeCurto, pluralizar } from "@/lib/format";
+import { nomeCurto, normalizar, pluralizar } from "@/lib/format";
 import { useEnvio } from "@/lib/hooks";
 import { ROLE_TYPE_LABEL, type Character, type Person, type Trait } from "@/lib/types";
 import {
@@ -13,6 +13,7 @@ import {
   Botao,
   Cartao,
   Divisor,
+  Entrada,
   Status,
   Tag,
   TituloSecao,
@@ -95,6 +96,7 @@ export function AbaElenco({
 }) {
   const { enviando, erro, enviar } = useEnvio();
   const [emFoco, setEmFoco] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
 
   const nomeTrait = useMemo(
     () => new Map(caracteristicas.map((t) => [t.id, t.nome])),
@@ -115,6 +117,18 @@ export function AbaElenco({
    * `personagemFoco` muda de identidade a cada render.
    */
   const candidatos = listarCandidatos(personagemFoco, pessoas, personagens);
+  /*
+   * A lista mostra as 8 primeiras sugestões, senão o cartão vira uma rolagem do
+   * cadastro inteiro. Só que 8 de 42 deixava a maioria fora de alcance — e
+   * ainda mais depois que quem entrou pelo acervo passou a ficar no fim da
+   * ordenação. A busca pelo nome é o caminho para chegar em qualquer um.
+   */
+  const encontrados = useMemo(() => {
+    const termo = normalizar(busca);
+    if (!termo) return candidatos;
+    return candidatos.filter((c) => normalizar(c.pessoa.nome).includes(termo));
+  }, [candidatos, busca]);
+  const visiveis = encontrados.slice(0, 8);
 
   async function escalar(personagem: Character, personId: string | null) {
     const pessoa = personId ? porId.get(personId) : null;
@@ -276,13 +290,30 @@ export function AbaElenco({
                   : "Nenhuma característica desejada definida para este papel."}
               </p>
 
-              {candidatos.length === 0 ? (
+              <div className="relative mb-3">
+                <MagnifyingGlass
+                  size={16}
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-caption"
+                />
+                <Entrada
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar pelo nome"
+                  aria-label="Buscar candidato pelo nome"
+                  className="pl-9"
+                />
+              </div>
+
+              {visiveis.length === 0 ? (
                 <p className="text-[13px] text-ink-caption">
-                  Nenhuma pessoa ativa cadastrada. Cadastre integrantes na tela Pessoas.
+                  {busca
+                    ? `Ninguém no cadastro com “${busca}”.`
+                    : "Nenhuma pessoa cadastrada. Cadastre integrantes na tela Pessoas."}
                 </p>
               ) : (
                 <ul className="space-y-2.5">
-                  {candidatos.slice(0, 8).map((candidato, indice) => {
+                  {visiveis.map((candidato, indice) => {
                     const escaladaAqui = personagemFoco.personId === candidato.pessoa.id;
                     return (
                       <li
@@ -331,6 +362,14 @@ export function AbaElenco({
                   })}
                 </ul>
               )}
+
+              {/* O corte precisa ser visível: senão a direção acha que o resto do grupo não existe. */}
+              {encontrados.length > visiveis.length ? (
+                <p className="mt-2.5 text-[12px] leading-[18px] text-ink-caption">
+                  Mostrando {visiveis.length} de {encontrados.length}. Busque pelo nome para achar
+                  quem não está aqui.
+                </p>
+              ) : null}
 
               {personagemFoco.personId ? (
                 <>
