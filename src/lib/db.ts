@@ -522,6 +522,34 @@ export async function registrarPecaAntiga(dados: {
   return { playId: pecaRef.id, participacoes };
 }
 
+/**
+ * Define quem dirigiu a peça.
+ *
+ * Lista inteira de uma vez, não item por item: a tela edita o conjunto, e
+ * gravar em partes deixaria estado intermediário visível para o elenco.
+ */
+export async function definirDirecao(
+  playId: string,
+  direcao: { diretores: string[]; vicesDiretores: string[] },
+): Promise<void> {
+  await updateDoc(doc(db, "plays", playId), direcao);
+}
+
+/**
+ * Peças que a pessoa dirigiu ou co-dirigiu, da mais recente para a mais antiga.
+ *
+ * Filtra no cliente sobre a lista de peças em vez de consultar por
+ * `array-contains`: seriam duas consultas — uma por campo — e cada uma exigiria
+ * índice. O acervo tem dezenas de peças, não milhares, e a lista já é lida por
+ * outras telas.
+ */
+export async function listarPecasDirigidas(personId: string): Promise<Play[]> {
+  const pecas = await listarPecas();
+  return pecas.filter(
+    (p) => p.diretores?.includes(personId) || p.vicesDiretores?.includes(personId),
+  );
+}
+
 /* ------------------------------------------------------------- personagens */
 
 export async function listarPersonagens(playId: string): Promise<Character[]> {

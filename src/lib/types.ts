@@ -176,6 +176,16 @@ export interface Play {
    * quê. Ausente significa em aberto — é o estado de quem acabou de nascer.
    */
   elencoFechado?: boolean;
+  /**
+   * Quem dirigiu a peça, por `personId`.
+   *
+   * Fora do elenco de propósito: dirigir é função de produção, não papel de
+   * atuação. Se direção fosse um tipo de papel, quem só dirigiu apareceria no
+   * histórico como se tivesse atuado — e quem dirigiu e atuou perderia um dos
+   * dois. São listas porque peça costuma ter um diretor e mais de um vice.
+   */
+  diretores?: string[];
+  vicesDiretores?: string[];
   /** Apenas uma peça pode ser a atual (regra 7 do briefing). */
   atual: boolean;
   roteiroVersao: number;

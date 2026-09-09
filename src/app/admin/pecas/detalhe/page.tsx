@@ -26,6 +26,7 @@ import {
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
 import { AbaDados } from "@/components/admin/aba-dados";
 import { AbaElenco } from "@/components/admin/aba-elenco";
+import { DirecaoDaPeca } from "@/components/admin/direcao-da-peca";
 import { AbaEnsaios } from "@/components/admin/aba-ensaios";
 import { AbaRoteiro } from "@/components/admin/aba-roteiro";
 import { AbaPersonagens } from "@/components/admin/aba-personagens";
@@ -227,14 +228,26 @@ function ConteudoPeca() {
         {aba === "ensaios" ? <AbaEnsaios playId={peca.id} /> : null}
 
         {aba === "elenco" ? (
-          <AbaElenco
-            playId={peca.id}
+          <>
+            {/*
+              * Fora do AbaElenco de propósito: aquele componente para em
+              * "cadastre os personagens primeiro", e peça do acervo costuma
+              * ter direção conhecida antes do elenco.
+              */}
+            <DirecaoDaPeca
+              peca={peca}
+              pessoas={dados.dados?.pessoas ?? []}
+              onAtualizar={dados.recarregar}
+            />
+            <AbaElenco
+              playId={peca.id}
             personagens={personagens}
             pessoas={dados.dados?.pessoas ?? []}
             caracteristicas={dados.dados?.caracteristicas ?? []}
-            falasPorPersonagem={falasPorPersonagem}
-            onAtualizar={dados.recarregar}
-          />
+              falasPorPersonagem={falasPorPersonagem}
+              onAtualizar={dados.recarregar}
+            />
+          </>
         ) : null}
       </CorpoAdmin>
     </>
