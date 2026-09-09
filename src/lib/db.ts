@@ -143,15 +143,6 @@ export async function buscarPessoa(id: string): Promise<Person | null> {
   return snap.exists() ? ({ id: snap.id, ...snap.data() } as Person) : null;
 }
 
-/** Usada no cadastro para vincular a conta à pessoa já registrada pela direção. */
-export async function buscarPessoaPorEmail(email: string): Promise<Person | null> {
-  const snap = await getDocs(
-    query(collection(db, "people"), where("email", "==", email.toLowerCase()), limit(1)),
-  );
-  const primeiro = snap.docs[0];
-  return primeiro ? comId<Person>(primeiro) : null;
-}
-
 export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promise<string> {
   // As características saem do documento da pessoa: veja REF_ATRIBUICOES.
   const { caracteristicas, ...doDocumento } = dados;

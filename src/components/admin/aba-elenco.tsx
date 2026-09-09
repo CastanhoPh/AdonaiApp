@@ -46,8 +46,18 @@ function listarCandidatos(
     if (p.personId && p.id !== personagemFoco.id) escaladaEm.set(p.personId, p.nome);
   });
 
+  /*
+   * Todo o cadastro entra, não só quem está ativo.
+   *
+   * "Ativa no grupo" passa a significar "tem acesso ao app", e quem entrou pelo
+   * acervo entra sem conta — inativo. Filtrar por ativo aqui reduzia os
+   * candidatos de 42 para 4 e tornava impossível escalar quem o app conhece
+   * mas ainda não tem acesso, que é a maioria do grupo.
+   *
+   * Inativo vai para o fim da lista e leva marca própria: continua disponível,
+   * mas não é a primeira sugestão.
+   */
   return pessoas
-    .filter((pessoa) => pessoa.ativo)
     .map((pessoa) => {
       const atende = desejadas.filter((id) => pessoa.caracteristicas?.includes(id));
       return {
@@ -58,6 +68,10 @@ function listarCandidatos(
       };
     })
     .sort((a, b) => {
+      // Ativo primeiro: é quem a direção alcança hoje pelo app.
+      const ativoA = a.pessoa.ativo !== false;
+      const ativoB = b.pessoa.ativo !== false;
+      if (ativoA !== ativoB) return ativoA ? -1 : 1;
       if (a.atende.length !== b.atende.length) return b.atende.length - a.atende.length;
       if (Boolean(a.jaEscaladaEm) !== Boolean(b.jaEscaladaEm)) return a.jaEscaladaEm ? 1 : -1;
       return a.pessoa.nome.localeCompare(b.pessoa.nome);
@@ -290,6 +304,10 @@ export function AbaElenco({
                                 {nomeTrait.get(id)}
                               </Tag>
                             ))}
+                            {candidato.pessoa.ativo === false ? (
+                              /* Sem acesso ao app: escalável, mas não recebe aviso nem confirma presença. */
+                              <Tag tom="aviso">Sem acesso</Tag>
+                            ) : null}
                             {candidato.jaEscaladaEm ? (
                               <span className="text-[11px] leading-4 text-ink-caption">
                                 Já escalado em {candidato.jaEscaladaEm}
