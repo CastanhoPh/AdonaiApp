@@ -1,0 +1,638 @@
+/**
+ * Camada de acesso ao Firestore. Todas as regras de negócio que envolvem mais de
+ * um documento (peça atual, conclusão de peça, escalação) vivem aqui.
+ */
+import {
+  arrayUnion,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc as getDocDoSdk,
+  getDocFromCache,
+  getDocs as getDocsDoSdk,
+  getDocsFromCache,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+  type DocumentData,
+  type DocumentReference,
+  type DocumentSnapshot,
+  type Query,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
+} from "firebase/firestore";
+import { db } from "./firebase";
+import { hojeISO } from "./format";
+
+/*
+ * Leitura do disco primeiro, servidor por trás.
+ *
+ * O `getDocs` do SDK sempre espera o servidor, então toda tela pagava a ida e
+ * volta antes de mostrar qualquer coisa — os "três quadrados" de carregamento
+ * apareciam a cada primeira visita de aba. Aqui a consulta é respondida pelo
+ * cache em disco (ligado em `firebase.ts`) quando ele tem algo, e a busca no
+ * servidor segue em paralelo só para deixar o disco atualizado para a próxima
+ * vez.
+ *
+ * A correção fica com o próprio Firestore, não com um cache meu: toda escrita
+ * pelo SDK já atualiza o cache local na hora, então não existe invalidação
+ * manual para esquecer. Cache vazio cai direto no servidor, que é o certo —
+ * não se pode confundir "coleção vazia" com "nunca baixada".
+ *
+ * Estes dois nomes cobrem as leituras do arquivo inteiro sem tocar em nenhuma
+ * chamada: os pontos de uso continuam escrevendo `getDocs`/`getDoc`.
+ */
+async function getDocs<T>(consulta: Query<T>): Promise<QuerySnapshot<T>> {
+  try {
+    const doDisco = await getDocsFromCache(consulta);
+    if (!doDisco.empty) {
+      void getDocsDoSdk(consulta).catch(() => {});
+      return doDisco;
+    }
+  } catch {
+    // Sem IndexedDB (navegação privada, armazenamento bloqueado): vai ao servidor.
+  }
+  return getDocsDoSdk(consulta);
+}
+
+async function getDoc<T>(referencia: DocumentReference<T>): Promise<DocumentSnapshot<T>> {
+  try {
+    const doDisco = await getDocFromCache(referencia);
+    if (doDisco.exists()) {
+      void getDocDoSdk(referencia).catch(() => {});
+      return doDisco;
+    }
+  } catch {
+    // Documento ainda não está no disco: busca normal.
+  }
+  return getDocDoSdk(referencia);
+}
+import type {
+  Aviso,
+  Character,
+  Participation,
+  Person,
+  PersonNotes,
+  Play,
+  Presenca,
+  PresencaEstado,
+  Rehearsal,
+  ScriptLine,
+  Trait,
+  UserAccount,
+} from "./types";
+
+function comId<T>(snap: QueryDocumentSnapshot<DocumentData>): T {
+  return { id: snap.id, ...snap.data() } as T;
+}
+
+/* ------------------------------------------------------------------ contas */
+
+export async function buscarConta(uid: string): Promise<UserAccount | null> {
+  const snap = await getDoc(doc(db, "users", uid));
+  return snap.exists() ? ({ uid: snap.id, ...snap.data() } as UserAccount) : null;
+}
+
+/**
+ * Guarda o token de push do aparelho na conta. `arrayUnion` evita duplicar
+ * quando a pessoa reabre o app no mesmo aparelho.
+ */
+export async function salvarTokenFcm(uid: string, token: string): Promise<void> {
+  await setDoc(doc(db, "users", uid), { tokensFcm: arrayUnion(token) }, { merge: true });
+}
+
+export async function salvarConta(conta: UserAccount): Promise<void> {
+  const { uid, ...dados } = conta;
+  await setDoc(doc(db, "users", uid), dados, { merge: true });
+}
+
+/* ----------------------------------------------------------------- pessoas */
+
+export async function listarPessoas(): Promise<Person[]> {
+  const snap = await getDocs(query(collection(db, "people"), orderBy("nome")));
+  return snap.docs.map((d) => comId<Person>(d));
+}
+
+export async function buscarPessoa(id: string): Promise<Person | null> {
+  const snap = await getDoc(doc(db, "people", id));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Person) : null;
+}
+
+/** Usada no cadastro para vincular a conta à pessoa já registrada pela direção. */
+export async function buscarPessoaPorEmail(email: string): Promise<Person | null> {
+  const snap = await getDocs(
+    query(collection(db, "people"), where("email", "==", email.toLowerCase()), limit(1)),
+  );
+  const primeiro = snap.docs[0];
+  return primeiro ? comId<Person>(primeiro) : null;
+}
+
+export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promise<string> {
+  const ref = doc(collection(db, "people"));
+  await setDoc(ref, {
+    ...dados,
+    email: dados.email.toLowerCase(),
+    criadoEm: new Date().toISOString(),
+  });
+  return ref.id;
+}
+
+export async function atualizarPessoa(id: string, dados: Partial<Person>): Promise<void> {
+  const limpo = { ...dados };
+  delete limpo.id;
+  if (typeof limpo.email === "string") limpo.email = limpo.email.toLowerCase();
+  await updateDoc(doc(db, "people", id), limpo);
+}
+
+/** Campos que a própria pessoa preenche no cadastro de primeiro acesso. */
+export type CadastroDaPessoa = Pick<
+  Person,
+  | "nome"
+  | "telefone"
+  | "nascimento"
+  | "responsavelNome"
+  | "responsavelTelefone"
+  | "jaAtuou"
+  | "experiencia"
+  | "pecasAnteriores"
+>;
+
+/**
+ * Grava as respostas do cadastro e marca a conclusão. `cadastroCompletoEm`
+ * vazio é o que faz o formulário reaparecer no próximo acesso, então ele é
+ * escrito junto com os dados, nunca antes.
+ */
+export async function completarCadastro(
+  personId: string,
+  dados: CadastroDaPessoa,
+): Promise<void> {
+  await updateDoc(doc(db, "people", personId), {
+    ...dados,
+    cadastroCompletoEm: new Date().toISOString(),
+  });
+}
+
+/** Observações da direção: subcoleção lida apenas por administradores. */
+export async function buscarObservacoes(personId: string): Promise<PersonNotes | null> {
+  const snap = await getDoc(doc(db, "people", personId, "privado", "direcao"));
+  return snap.exists() ? (snap.data() as PersonNotes) : null;
+}
+
+export async function salvarObservacoes(personId: string, observacoes: string): Promise<void> {
+  await setDoc(doc(db, "people", personId, "privado", "direcao"), {
+    observacoes,
+    atualizadoEm: new Date().toISOString(),
+  });
+}
+
+/* --------------------------------------------------------- características */
+
+export async function listarCaracteristicas(): Promise<Trait[]> {
+  const snap = await getDocs(query(collection(db, "traits"), orderBy("ordem")));
+  return snap.docs.map((d) => comId<Trait>(d));
+}
+
+export async function criarCaracteristica(nome: string, ordem: number): Promise<string> {
+  const ref = doc(collection(db, "traits"));
+  await setDoc(ref, { nome, ordem, ativo: true });
+  return ref.id;
+}
+
+
+/* ------------------------------------------------------------------- peças */
+
+export async function listarPecas(): Promise<Play[]> {
+  const snap = await getDocs(query(collection(db, "plays"), orderBy("criadoEm", "desc")));
+  return snap.docs.map((d) => comId<Play>(d));
+}
+
+export async function buscarPeca(id: string): Promise<Play | null> {
+  const snap = await getDoc(doc(db, "plays", id));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as Play) : null;
+}
+
+/** Apenas uma peça é a atual; a consulta devolve a primeira marcada. */
+export async function buscarPecaAtual(): Promise<Play | null> {
+  const snap = await getDocs(query(collection(db, "plays"), where("atual", "==", true), limit(1)));
+  const primeiro = snap.docs[0];
+  return primeiro ? comId<Play>(primeiro) : null;
+}
+
+/** Campos que quem cria a peça informa; o resto nasce com valor padrão. */
+export type NovaPeca = Omit<
+  Play,
+  "id" | "criadoEm" | "roteiroVersao" | "roteiroPublicado" | "roteiroPublicadoEm" | "roteiroEditadoEm"
+>;
+
+export async function criarPeca(dados: NovaPeca): Promise<string> {
+  const ref = doc(collection(db, "plays"));
+  await setDoc(ref, {
+    ...dados,
+    atual: false,
+    roteiroVersao: 1,
+    roteiroPublicado: false,
+    roteiroPublicadoEm: "",
+    roteiroEditadoEm: "",
+    criadoEm: new Date().toISOString(),
+  });
+  if (dados.atual) await definirPecaAtual(ref.id);
+  return ref.id;
+}
+
+export async function atualizarPeca(id: string, dados: Partial<Play>): Promise<void> {
+  const limpo = { ...dados };
+  delete limpo.id;
+  delete limpo.atual; // trocar a peça atual passa por definirPecaAtual
+  await updateDoc(doc(db, "plays", id), limpo);
+}
+
+/**
+ * Marca a peça como atual e desmarca todas as outras — garante a regra de que
+ * somente uma peça é considerada a peça atual.
+ */
+export async function definirPecaAtual(id: string): Promise<void> {
+  const todas = await getDocs(collection(db, "plays"));
+  const lote = writeBatch(db);
+  let mudou = false;
+  todas.docs.forEach((d) => {
+    const deveSerAtual = d.id === id;
+    if (Boolean(d.data().atual) !== deveSerAtual) {
+      lote.update(d.ref, { atual: deveSerAtual });
+      mudou = true;
+    }
+  });
+  if (mudou) await lote.commit();
+}
+
+/**
+ * Conclui a peça: registra a participação de cada personagem escalado no
+ * histórico e deixa de considerá-la a peça atual. Devolve quantas
+ * participações novas foram criadas.
+ */
+export async function concluirPeca(id: string): Promise<number> {
+  const peca = await buscarPeca(id);
+  if (!peca) throw new Error("Peça não encontrada.");
+
+  const personagens = await listarPersonagens(id);
+  const escalados = personagens.filter((p) => p.personId);
+
+  const existentes = await getDocs(
+    query(collection(db, "participations"), where("playId", "==", id)),
+  );
+  const jaRegistrados = new Set(
+    existentes.docs.map((d) => `${d.data().personId}:${d.data().characterId}`),
+  );
+
+  const lote = writeBatch(db);
+  let novos = 0;
+  const agora = new Date().toISOString();
+
+  for (const personagem of escalados) {
+    const chave = `${personagem.personId}:${personagem.id}`;
+    if (jaRegistrados.has(chave)) continue;
+    const ref = doc(collection(db, "participations"));
+    const participacao: Omit<Participation, "id"> = {
+      personId: personagem.personId as string,
+      playId: peca.id,
+      playTitulo: peca.titulo,
+      playCapaUrl: peca.capaUrl ?? "",
+      characterId: personagem.id,
+      characterNome: personagem.nome,
+      tipoPapel: personagem.tipoPapel,
+      periodo: peca.dataApresentacao || hojeISO(),
+      concluidaEm: agora,
+    };
+    lote.set(ref, participacao);
+    novos += 1;
+  }
+
+  lote.update(doc(db, "plays", id), { status: "concluida", atual: false });
+  await lote.commit();
+  return novos;
+}
+
+/* ------------------------------------------------------------- personagens */
+
+export async function listarPersonagens(playId: string): Promise<Character[]> {
+  const snap = await getDocs(
+    query(collection(db, "plays", playId, "characters"), orderBy("ordem")),
+  );
+  return snap.docs.map((d) => comId<Character>(d));
+}
+
+/** Personagem da pessoa na peça informada, ou nulo se ela não está escalada. */
+export async function buscarPersonagemDaPessoa(
+  playId: string,
+  personId: string,
+): Promise<Character | null> {
+  const snap = await getDocs(
+    query(
+      collection(db, "plays", playId, "characters"),
+      where("personId", "==", personId),
+      limit(1),
+    ),
+  );
+  const primeiro = snap.docs[0];
+  return primeiro ? comId<Character>(primeiro) : null;
+}
+
+export async function criarPersonagem(
+  playId: string,
+  dados: Omit<Character, "id" | "playId">,
+): Promise<string> {
+  const ref = doc(collection(db, "plays", playId, "characters"));
+  await setDoc(ref, { ...dados, playId });
+  return ref.id;
+}
+
+export async function atualizarPersonagem(
+  playId: string,
+  id: string,
+  dados: Partial<Character>,
+): Promise<void> {
+  const limpo = { ...dados };
+  delete limpo.id;
+  delete limpo.playId;
+  await updateDoc(doc(db, "plays", playId, "characters", id), limpo);
+}
+
+export async function removerPersonagem(playId: string, id: string): Promise<void> {
+  await deleteDoc(doc(db, "plays", playId, "characters", id));
+}
+
+/**
+ * Escala (ou desescala) uma pessoa em um personagem. Como cada personagem
+ * aceita apenas uma pessoa por vez, a pessoa é retirada de qualquer outro
+ * personagem da mesma peça antes de ser vinculada.
+ */
+export async function escalarPessoa(
+  playId: string,
+  characterId: string,
+  personId: string | null,
+  personNome: string,
+): Promise<void> {
+  const lote = writeBatch(db);
+
+  if (personId) {
+    const jaEscalada = await getDocs(
+      query(collection(db, "plays", playId, "characters"), where("personId", "==", personId)),
+    );
+    jaEscalada.docs
+      .filter((d) => d.id !== characterId)
+      .forEach((d) =>
+        lote.update(d.ref, { personId: null, personNome: "", situacao: "pendente" }),
+      );
+  }
+
+  lote.update(doc(db, "plays", playId, "characters", characterId), {
+    personId,
+    personNome: personId ? personNome : "",
+    situacao: personId ? "confirmado" : "pendente",
+  });
+
+  await lote.commit();
+}
+
+/* ----------------------------------------------------------------- roteiro */
+
+export async function listarFalas(playId: string): Promise<ScriptLine[]> {
+  const snap = await getDocs(collection(db, "plays", playId, "lines"));
+  return snap.docs
+    .map((d) => comId<ScriptLine>(d))
+    .sort((a, b) => a.ato - b.ato || a.cena - b.cena || a.ordem - b.ordem);
+}
+
+/**
+ * Falas de um personagem só. As telas de Início e Meu personagem precisam
+ * apenas destas — baixar o roteiro inteiro para contar "14 falas suas" custa
+ * centenas de documentos por abertura de tela.
+ */
+export async function listarFalasDoPersonagem(
+  playId: string,
+  characterId: string,
+): Promise<ScriptLine[]> {
+  const snap = await getDocs(
+    query(collection(db, "plays", playId, "lines"), where("characterId", "==", characterId)),
+  );
+  return snap.docs
+    .map((d) => comId<ScriptLine>(d))
+    .sort((a, b) => a.ato - b.ato || a.cena - b.cena || a.ordem - b.ordem);
+}
+
+export async function criarFala(
+  playId: string,
+  dados: Omit<ScriptLine, "id" | "playId">,
+): Promise<string> {
+  const ref = doc(collection(db, "plays", playId, "lines"));
+  await setDoc(ref, { ...dados, playId });
+  return ref.id;
+}
+
+export async function atualizarFala(
+  playId: string,
+  id: string,
+  dados: Partial<ScriptLine>,
+): Promise<void> {
+  const limpo = { ...dados };
+  delete limpo.id;
+  delete limpo.playId;
+  await updateDoc(doc(db, "plays", playId, "lines", id), limpo);
+}
+
+export async function removerFala(playId: string, id: string): Promise<void> {
+  await deleteDoc(doc(db, "plays", playId, "lines", id));
+}
+
+/** Reescreve o campo `ordem` das falas na sequência recebida. */
+export async function reordenarFalas(playId: string, falas: ScriptLine[]): Promise<void> {
+  const lote = writeBatch(db);
+  let mudou = false;
+  falas.forEach((fala, indice) => {
+    if (fala.ordem !== indice) {
+      lote.update(doc(db, "plays", playId, "lines", fala.id), { ordem: indice });
+      mudou = true;
+    }
+  });
+  if (mudou) await lote.commit();
+}
+
+/**
+ * Publica o roteiro para os participantes. A primeira publicação mantém a
+ * versão 1; as seguintes incrementam o número da versão.
+ */
+export async function publicarRoteiro(
+  playId: string,
+  peca: Play,
+  totais: { falas: number; cenas: number },
+): Promise<void> {
+  await updateDoc(doc(db, "plays", playId), {
+    roteiroPublicado: true,
+    roteiroVersao: peca.roteiroPublicado ? peca.roteiroVersao + 1 : peca.roteiroVersao,
+    roteiroPublicadoEm: hojeISO(),
+    // Guardados na publicação para as telas do participante não precisarem
+    // varrer o roteiro só para saber o tamanho dele.
+    totalFalas: totais.falas,
+    totalCenas: totais.cenas,
+  });
+}
+
+/** Registra a hora da última alteração no rascunho do roteiro. */
+export async function marcarRoteiroEditado(playId: string): Promise<void> {
+  await updateDoc(doc(db, "plays", playId), { roteiroEditadoEm: new Date().toISOString() });
+}
+
+/**
+ * Renomeia ato e cena em todas as linhas correspondentes. Os títulos vivem
+ * repetidos nas linhas para o roteiro caber em uma leitura só, sem uma
+ * coleção separada de atos e cenas.
+ */
+export async function renomearCena(
+  playId: string,
+  ato: number,
+  cena: number,
+  dados: { atoTitulo?: string; cenaTitulo?: string },
+): Promise<void> {
+  const snap = await getDocs(
+    query(collection(db, "plays", playId, "lines"), where("ato", "==", ato)),
+  );
+  const alvos = snap.docs.filter(
+    (d) => dados.cenaTitulo === undefined || d.data().cena === cena,
+  );
+  if (alvos.length === 0) return;
+  const lote = writeBatch(db);
+  alvos.forEach((d) => {
+    const campos: Record<string, string> = {};
+    if (dados.atoTitulo !== undefined) campos.atoTitulo = dados.atoTitulo;
+    if (dados.cenaTitulo !== undefined && d.data().cena === cena) {
+      campos.cenaTitulo = dados.cenaTitulo;
+    }
+    if (Object.keys(campos).length > 0) lote.update(d.ref, campos);
+  });
+  await lote.commit();
+}
+
+/** Renomeia o personagem nas falas já cadastradas, mantendo o roteiro coerente. */
+export async function renomearPersonagemNasFalas(
+  playId: string,
+  characterId: string,
+  nome: string,
+): Promise<void> {
+  const snap = await getDocs(
+    query(collection(db, "plays", playId, "lines"), where("characterId", "==", characterId)),
+  );
+  if (snap.empty) return;
+  const lote = writeBatch(db);
+  snap.docs.forEach((d) => lote.update(d.ref, { characterNome: nome }));
+  await lote.commit();
+}
+
+/* ----------------------------------------------------------------- ensaios */
+
+/** Ensaios ordenados por data crescente — os mais próximos primeiro. */
+export async function listarEnsaios(playId?: string): Promise<Rehearsal[]> {
+  const base = collection(db, "rehearsals");
+  const snap = await getDocs(playId ? query(base, where("playId", "==", playId)) : query(base));
+  return snap.docs
+    .map((d) => comId<Rehearsal>(d))
+    .sort((a, b) => a.data.localeCompare(b.data) || a.horaInicio.localeCompare(b.horaInicio));
+}
+
+
+export async function criarEnsaio(dados: Omit<Rehearsal, "id">): Promise<string> {
+  const ref = doc(collection(db, "rehearsals"));
+  await setDoc(ref, dados);
+  return ref.id;
+}
+
+export async function atualizarEnsaio(id: string, dados: Partial<Rehearsal>): Promise<void> {
+  const limpo = { ...dados };
+  delete limpo.id;
+  await updateDoc(doc(db, "rehearsals", id), limpo);
+}
+
+export async function removerEnsaio(id: string): Promise<void> {
+  await deleteDoc(doc(db, "rehearsals", id));
+}
+
+/* ------------------------------------------------------------------ avisos */
+
+/** Enfileira um aviso. Quem entrega é o disparador, fora do navegador. */
+export async function criarAviso(
+  dados: Omit<Aviso, "id" | "criadoEm" | "status" | "enviadoEm" | "detalhe" | "entregues">,
+): Promise<string> {
+  const ref = doc(collection(db, "avisos"));
+  await setDoc(ref, {
+    ...dados,
+    criadoEm: new Date().toISOString(),
+    status: "pendente",
+    enviadoEm: "",
+    detalhe: "",
+    entregues: 0,
+  });
+  return ref.id;
+}
+
+/** Avisos mais recentes primeiro. */
+export async function listarAvisos(quantos = 20): Promise<Aviso[]> {
+  const snap = await getDocs(
+    query(collection(db, "avisos"), orderBy("criadoEm", "desc"), limit(quantos)),
+  );
+  return snap.docs.map((d) => comId<Aviso>(d));
+}
+
+/* ---------------------------------------------------------------- presenças */
+
+/** Respostas de presença de um ensaio, na ordem dos nomes. */
+export async function listarPresencas(rehearsalId: string): Promise<Presenca[]> {
+  const snap = await getDocs(collection(db, "rehearsals", rehearsalId, "presencas"));
+  return snap.docs
+    .map((d) => ({ ...(d.data() as Presenca), personId: d.id }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+}
+
+export async function buscarPresenca(
+  rehearsalId: string,
+  personId: string,
+): Promise<Presenca | null> {
+  const snap = await getDoc(doc(db, "rehearsals", rehearsalId, "presencas", personId));
+  return snap.exists() ? ({ ...(snap.data() as Presenca), personId: snap.id }) : null;
+}
+
+/**
+ * Registra a resposta de presença. O id do documento é o da pessoa, o que faz
+ * a resposta ser idempotente: responder de novo substitui a anterior.
+ */
+export async function salvarPresenca(
+  rehearsalId: string,
+  personId: string,
+  nome: string,
+  estado: PresencaEstado,
+  justificativa = "",
+): Promise<void> {
+  await setDoc(doc(db, "rehearsals", rehearsalId, "presencas", personId), {
+    nome,
+    estado,
+    justificativa: justificativa.trim(),
+    atualizadoEm: new Date().toISOString(),
+  });
+}
+
+/* ----------------------------------------------------------- participações */
+
+export async function listarParticipacoes(personId: string): Promise<Participation[]> {
+  const snap = await getDocs(
+    query(collection(db, "participations"), where("personId", "==", personId)),
+  );
+  return snap.docs
+    .map((d) => comId<Participation>(d))
+    .sort((a, b) => (b.periodo ?? "").localeCompare(a.periodo ?? ""));
+}
+
+export async function listarTodasParticipacoes(): Promise<Participation[]> {
+  const snap = await getDocs(collection(db, "participations"));
+  return snap.docs.map((d) => comId<Participation>(d));
+}
