@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel
@@ -39,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Conta de servico do Firebase usada pelos scripts de administracao.
+# Os padroes cobrem o nome que o console gera, que comeca com o id do projeto.
+*firebase-adminsdk*.json
+*serviceaccount*.json
+*service-account*.json
+
+# Cache local do Firebase CLI (.firebaserc é versionado)
+.firebase/

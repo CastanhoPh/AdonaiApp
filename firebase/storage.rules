@@ -1,0 +1,26 @@
+rules_version = '2';
+
+// Arquivos do AdonaiApp: fotos de integrantes, capas de peças e imagens de
+// personagens. Leitura para quem está autenticado; envio apenas pela direção.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function ehAdmin() {
+      return autenticado()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /pessoas/{arquivo=**} {
+      allow read: if autenticado();
+      allow write: if ehAdmin();
+    }
+
+    match /pecas/{arquivo=**} {
+      allow read: if autenticado();
+      allow write: if ehAdmin();
+    }
+  }
+}

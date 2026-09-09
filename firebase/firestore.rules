@@ -1,0 +1,148 @@
+rules_version = '2';
+
+// Regras de acesso do AdonaiApp.
+//
+// Princípios:
+//  - Somente administradores alteram elenco, roteiro, peças e ensaios.
+//  - Participantes leem os dados da produção e editam apenas telefone e foto
+//    do próprio cadastro.
+//  - As observações internas da direção ficam em `people/{id}/privado/*`,
+//    fora do alcance dos participantes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function temConta() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function conta() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function ehAdmin() {
+      return temConta() && conta().role == 'admin';
+    }
+
+    // ----------------------------------------------------------- contas
+
+    match /users/{uid} {
+      // O vínculo com uma pessoa só é aceito quando o e-mail do cadastro
+      // confere com o e-mail autenticado — evita assumir o perfil de outro.
+      function vinculoValido() {
+        return request.resource.data.personId == null
+          || get(/databases/$(database)/documents/people/$(request.resource.data.personId)).data.email
+             == request.auth.token.email.lower();
+      }
+
+      allow get, list: if autenticado() && (request.auth.uid == uid || ehAdmin());
+
+      // Cada integrante cria a própria conta, sempre como participante.
+      // Administradores são promovidos pelo script `npm run admin`.
+      allow create: if autenticado()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'participante'
+        && request.resource.data.email == request.auth.token.email.lower()
+        && vinculoValido();
+
+      allow update: if ehAdmin()
+        || (autenticado()
+            && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && vinculoValido());
+
+      allow delete: if ehAdmin();
+    }
+
+    // ---------------------------------------------------------- pessoas
+
+    match /people/{personId} {
+      // O elenco precisa se enxergar; o cadastro em si é da direção.
+      allow get, list: if autenticado();
+      allow create, delete: if ehAdmin();
+      // A pessoa mantém os próprios dados e responde o cadastro de primeiro
+      // acesso. Fora desta lista nada muda: e-mail é o vínculo com a conta,
+      // `ativo` é decisão do grupo e `caracteristicas` é avaliação da direção.
+      allow update: if ehAdmin()
+        || (temConta()
+            && conta().personId == personId
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly([
+                 'nome',
+                 'telefone',
+                 'fotoUrl',
+                 'nascimento',
+                 'responsavelNome',
+                 'responsavelTelefone',
+                 'jaAtuou',
+                 'experiencia',
+                 'pecasAnteriores',
+                 'cadastroCompletoEm'
+               ]));
+
+      // Observações internas: exclusivas da direção.
+      match /privado/{documento} {
+        allow read, write: if ehAdmin();
+      }
+    }
+
+    // ------------------------------------------------- características
+
+    match /traits/{traitId} {
+      allow get, list: if autenticado();
+      allow write: if ehAdmin();
+    }
+
+    // ------------------------------------------------------------ peças
+
+    match /plays/{playId} {
+      allow get, list: if autenticado();
+      allow write: if ehAdmin();
+
+      match /characters/{characterId} {
+        allow get, list: if autenticado();
+        allow write: if ehAdmin();
+      }
+
+      match /lines/{lineId} {
+        allow get, list: if autenticado();
+        allow write: if ehAdmin();
+      }
+    }
+
+    // --------------------------------------------------------- ensaios
+
+    match /rehearsals/{rehearsalId} {
+      allow get, list: if autenticado();
+      allow write: if ehAdmin();
+
+      // Confirmação de presença. O id do documento é o da pessoa, então cada
+      // uma só escreve na própria resposta; a direção pode corrigir qualquer
+      // uma. Todo o elenco lê, para saber quem confirmou.
+      match /presencas/{personId} {
+        allow get, list: if autenticado();
+        allow write: if ehAdmin()
+          || (temConta() && conta().personId == personId);
+      }
+    }
+
+    // ----------------------------------------------------------- avisos
+
+    // Só a direção compõe e consulta os avisos. Quem entrega é o disparador,
+    // que usa credencial de servidor e não passa por estas regras.
+    match /avisos/{avisoId} {
+      allow read, write: if ehAdmin();
+    }
+
+    // --------------------------------------------------- participações
+
+    match /participations/{participationId} {
+      allow get, list: if autenticado();
+      allow write: if ehAdmin();
+    }
+  }
+}
