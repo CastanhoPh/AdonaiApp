@@ -452,14 +452,16 @@ function ConteudoAvisos() {
               Cancelar
             </Botao>
             <Botao variante="perigo" onClick={() => void apagarTodos()} disabled={enviando}>
-              {enviando ? "Apagando…" : `Apagar os ${avisos.length}`}
+              {/* Não é "os N desta tela": a lista mostra os 20 últimos e isto apaga a coleção. */}
+              {enviando ? "Apagando…" : "Apagar tudo"}
             </Botao>
           </>
         }
       >
         <div className="space-y-3">
           <p className="text-[14px] leading-[21px] text-ink-body">
-            O histórico de avisos fica vazio. Não dá para desfazer.
+            Todo o histórico de avisos é apagado, inclusive o que está mais antigo que os{" "}
+            {avisos.length} desta lista. Não dá para desfazer.
           </p>
           <Caixa tom="aviso">
             As notificações já entregues continuam nos celulares de quem recebeu — apagar aqui
