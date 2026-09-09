@@ -1,10 +1,10 @@
 "use client";
 
 import { useAuth } from "@/lib/auth-context";
-import { listarCaracteristicas, listarFalasDoPersonagem } from "@/lib/db";
+import { listarFalasDoPersonagem } from "@/lib/db";
 import { useCarregar } from "@/lib/hooks";
 import { useAtual } from "@/lib/uso-atual";
-import { ROLE_TYPE_LABEL, type Trait } from "@/lib/types";
+import { ROLE_TYPE_LABEL } from "@/lib/types";
 import { ErroCarregamento, TopoParticipante } from "@/components/shell";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
 import {
@@ -47,15 +47,6 @@ export default function MeuPersonagem() {
       };
     },
     [peca?.id, personagem?.id, peca?.totalCenas],
-  );
-
-  const caracteristicas = useCarregar<Trait[]>(
-    "caracteristicas-do-papel",
-    async () => (personagem?.caracteristicasDesejadas?.length ? listarCaracteristicas() : []),
-    [personagem?.id],
-  );
-  const desejadas = (caracteristicas.dados ?? []).filter((t) =>
-    personagem?.caracteristicasDesejadas?.includes(t.id),
   );
 
   if (!pessoa) {
@@ -151,19 +142,6 @@ export default function MeuPersonagem() {
             <p className="text-[15px] leading-[23px] whitespace-pre-line text-ink-body">
               {personagem.observacoes}
             </p>
-          </div>
-        </section>
-      ) : null}
-
-      {desejadas.length > 0 ? (
-        <section className="mb-5">
-          <Eyebrow>O papel pede</Eyebrow>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {desejadas.map((t) => (
-              <Tag key={t.id} tom="info">
-                {t.nome}
-              </Tag>
-            ))}
           </div>
         </section>
       ) : null}

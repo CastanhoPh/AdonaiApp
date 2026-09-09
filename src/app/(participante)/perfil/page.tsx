@@ -4,12 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowCounterClockwise, BellRinging, CaretRight } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth-context";
-import { atualizarPessoa, listarCaracteristicas, listarParticipacoes } from "@/lib/db";
+import { atualizarPessoa, listarParticipacoes } from "@/lib/db";
 import { ano, ehMenorDeIdade, idade, nomeCurto, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import { reabrirGuia } from "@/lib/instalacao";
 import { useAtual } from "@/lib/uso-atual";
-import { MAIORIDADE, ROLE_TYPE_LABEL, type Participation, type Trait } from "@/lib/types";
+import { MAIORIDADE, ROLE_TYPE_LABEL, type Participation } from "@/lib/types";
 import { TopoAba } from "@/components/shell";
 import { FormularioCadastro } from "@/components/acesso/cadastro-pessoa";
 import { ControleNotificacoes } from "@/components/comum/notificacoes";
@@ -37,15 +37,6 @@ export default function Perfil() {
     async () => (pessoa ? listarParticipacoes(pessoa.id) : []),
     [pessoa?.id],
   );
-  const caracteristicas = useCarregar<Trait[]>(
-    "caracteristicas-do-perfil",
-    async () => (pessoa?.caracteristicas?.length ? listarCaracteristicas() : []),
-    [pessoa?.id],
-  );
-  const minhas = (caracteristicas.dados ?? []).filter((t) =>
-    pessoa?.caracteristicas?.includes(t.id),
-  );
-
   const { enviando, erro, enviar } = useEnvio();
   /*
    * Cadastro incompleto abre já no formulário: é para cá que aponta a tarja
@@ -238,19 +229,6 @@ export default function Perfil() {
           ) : null}
         </Cartao>
       </div>
-
-      {minhas.length > 0 ? (
-        <section className="mb-4">
-          <Eyebrow>Suas características</Eyebrow>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {minhas.map((t) => (
-              <Tag key={t.id} tom="info">
-                {t.nome}
-              </Tag>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <Cartao className="mb-4 px-4 py-4">
         <div className="mb-3 flex items-start gap-3">

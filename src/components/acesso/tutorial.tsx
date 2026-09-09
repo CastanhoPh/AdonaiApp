@@ -197,7 +197,7 @@ function PassoBoasVindas() {
         <Item
           icone={<User size={20} />}
           titulo="Perfil"
-          texto="Seus dados, suas características e as peças que você já fez."
+          texto="Seus dados e as peças que você já fez."
         />
       </ul>
       <p className="mt-4 flex items-start gap-2 text-[13px] leading-5 text-ink-caption">

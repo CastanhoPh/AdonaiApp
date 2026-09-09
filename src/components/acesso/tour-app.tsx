@@ -253,7 +253,7 @@ function montarPassos(ehAdmin: boolean): Passo[] {
           <Linha
             icone={<User size={20} />}
             titulo="Perfil"
-            texto="Telefone e foto ficam editáveis por você; nome e características são da direção."
+            texto="Telefone e foto ficam editáveis por você; o nome é da direção."
           />
         </ul>
       ),
