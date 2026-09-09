@@ -17,6 +17,7 @@ import { ano, dataLonga, ehMenorDeIdade, idade, nomeCurto, pluralizar } from "@/
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import {
   MAIORIDADE,
+  ROLE_TYPES,
   ROLE_TYPE_LABEL,
   type Character,
   type Participation,
@@ -217,6 +218,27 @@ function ConteudoPerfil() {
     new Set(participacoes.map((p) => p.characterNome)),
   ).filter(Boolean);
 
+  /*
+   * Personagens agrupados por tipo de papel.
+   *
+   * A lista corrida de nomes dizia quantos personagens a pessoa fez, mas não
+   * o que ela costuma fazer — que é a pergunta de quem vai escalar. Doze nomes
+   * misturados esconde a diferença entre quem fez oito protagonistas e quem fez
+   * oito figurantes.
+   *
+   * Na ordem de ROLE_TYPES, que vai do papel de maior peso ao de menor. Nome
+   * repetido em peças diferentes conta uma vez por grupo: "Paçoca" foi
+   * protagonista em três peças e é um personagem, não três.
+   */
+  const porTipoDePapel = ROLE_TYPES.map((tipo) => ({
+    tipo,
+    nomes: Array.from(
+      new Set(
+        participacoes.filter((x) => x.tipoPapel === tipo).map((x) => x.characterNome),
+      ),
+    ).filter(Boolean),
+  })).filter((grupo) => grupo.nomes.length > 0);
+
   return (
     <>
       <TopoAdmin
@@ -381,10 +403,25 @@ function ConteudoPerfil() {
                   </p>
                 </div>
               </div>
-              {personagensAnteriores.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {personagensAnteriores.map((nome) => (
-                    <Tag key={nome}>{nome}</Tag>
+              {porTipoDePapel.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {porTipoDePapel.map((grupo) => (
+                    <div key={grupo.tipo}>
+                      <p className="mb-1.5 flex items-baseline gap-1.5 text-[12px] leading-[18px] text-ink-caption">
+                        {ROLE_TYPE_LABEL[grupo.tipo]}
+                        <span className="fonte-num text-ink-body">{grupo.nomes.length}</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {grupo.nomes.map((nome) => (
+                          <Tag
+                            key={nome}
+                            tom={grupo.tipo === "protagonista" ? "areia" : "neutro"}
+                          >
+                            {nome}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : null}
