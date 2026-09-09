@@ -30,7 +30,9 @@ import {
 export default function Perfil() {
   const { conta, pessoa, ehAdmin, sair, recarregar } = useAuth();
   const atual = useAtual();
-  const personagem = atual.dados?.personagem ?? null;
+  const personagens = atual.dados?.personagens ?? [];
+  // O card mostra um; com mais de um, o primeiro e a contagem do resto.
+  const principal = personagens[0] ?? null;
 
   const participacoes = useCarregar<Participation[]>(
     "perfil-participacoes",
@@ -210,11 +212,12 @@ export default function Perfil() {
         <Cartao className="px-4 py-3.5">
           <Eyebrow>Personagem</Eyebrow>
           <p className="mt-1 truncate text-[15px] leading-[22px] font-bold text-ink-heading">
-            {atual.carregando ? "…" : (personagem?.nome ?? "Nenhum")}
+            {atual.carregando ? "…" : (principal?.nome ?? "Nenhum")}
           </p>
-          {personagem ? (
+          {principal ? (
             <p className="text-[12px] leading-[18px] text-ink-caption">
-              {ROLE_TYPE_LABEL[personagem.tipoPapel]}
+              {ROLE_TYPE_LABEL[principal.tipoPapel]}
+              {personagens.length > 1 ? ` · +${personagens.length - 1}` : ""}
             </p>
           ) : null}
         </Cartao>

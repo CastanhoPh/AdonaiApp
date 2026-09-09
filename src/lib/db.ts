@@ -531,21 +531,29 @@ export async function listarPersonagens(playId: string): Promise<Character[]> {
   return snap.docs.map((d) => comId<Character>(d));
 }
 
-/** Personagem da pessoa na peça informada, ou nulo se ela não está escalada. */
-export async function buscarPersonagemDaPessoa(
+/**
+ * Todos os papéis da pessoa na peça. Vazio quando ela não está escalada.
+ *
+ * Antes escalar uma pessoa retirava ela de qualquer outro personagem da mesma
+ * peça — uma pessoa, um papel. A regra fazia sentido para produção em
+ * andamento, e não serve para o acervo: acumular papéis é comum, e em "A
+ * Resposta" a mesma pessoa fez assistente, guerreiro e narrador. Com a regra
+ * antiga, dois desses três desapareciam sem aviso ao serem cadastrados.
+ *
+ * Ordenado por `ordem`, então o primeiro é o papel mais relevante da peça —
+ * é ele que a interface mostra quando só cabe um.
+ */
+export async function listarPersonagensDaPessoa(
   playId: string,
   personId: string,
-): Promise<Character | null> {
+): Promise<Character[]> {
   const snap = await getDocs(
-    query(
-      collection(db, "plays", playId, "characters"),
-      where("personId", "==", personId),
-      limit(1),
-    ),
+    query(collection(db, "plays", playId, "characters"), where("personId", "==", personId)),
   );
-  const primeiro = snap.docs[0];
-  return primeiro ? comId<Character>(primeiro) : null;
+  // Ordena aqui: `where` com `orderBy` exigiria índice composto no Firestore.
+  return snap.docs.map((d) => comId<Character>(d)).sort((a, b) => a.ordem - b.ordem);
 }
+
 
 export async function criarPersonagem(
   playId: string,
@@ -591,26 +599,11 @@ export async function escalarPessoa(
   personId: string | null,
   personNome: string,
 ): Promise<void> {
-  const lote = writeBatch(db);
-
-  if (personId) {
-    const jaEscalada = await getDocs(
-      query(collection(db, "plays", playId, "characters"), where("personId", "==", personId)),
-    );
-    jaEscalada.docs
-      .filter((d) => d.id !== characterId)
-      .forEach((d) =>
-        lote.update(d.ref, { personId: null, personNome: "", situacao: "pendente" }),
-      );
-  }
-
-  lote.update(doc(db, "plays", playId, "characters", characterId), {
+  await updateDoc(doc(db, "plays", playId, "characters", characterId), {
     personId,
     personNome: personId ? personNome : "",
     situacao: personId ? "confirmado" : "pendente",
   });
-
-  await lote.commit();
 }
 
 /* ----------------------------------------------------------------- roteiro */
@@ -622,22 +615,6 @@ export async function listarFalas(playId: string): Promise<ScriptLine[]> {
     .sort((a, b) => a.ato - b.ato || a.cena - b.cena || a.ordem - b.ordem);
 }
 
-/**
- * Falas de um personagem só. As telas de Início e Meu personagem precisam
- * apenas destas — baixar o roteiro inteiro para contar "14 falas suas" custa
- * centenas de documentos por abertura de tela.
- */
-export async function listarFalasDoPersonagem(
-  playId: string,
-  characterId: string,
-): Promise<ScriptLine[]> {
-  const snap = await getDocs(
-    query(collection(db, "plays", playId, "lines"), where("characterId", "==", characterId)),
-  );
-  return snap.docs
-    .map((d) => comId<ScriptLine>(d))
-    .sort((a, b) => a.ato - b.ato || a.cena - b.cena || a.ordem - b.ordem);
-}
 
 export async function criarFala(
   playId: string,

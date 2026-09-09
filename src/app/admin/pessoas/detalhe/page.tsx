@@ -6,7 +6,7 @@ import {
   atualizarPessoa,
   buscarObservacoes,
   buscarPecaAtual,
-  buscarPersonagemDaPessoa,
+  listarPersonagensDaPessoa,
   buscarCaracteristicasAtribuidas,
   buscarPessoa,
   listarCaracteristicas,
@@ -54,7 +54,7 @@ type Aba = "geral" | "historico" | "observacoes";
 interface Dados {
   pessoa: Person | null;
   peca: Play | null;
-  personagem: Character | null;
+  personagens: Character[];
   participacoes: Participation[];
   caracteristicas: Trait[];
   observacoes: string;
@@ -77,7 +77,7 @@ function ConteudoPerfil() {
       return {
         pessoa: null,
         peca: null,
-        personagem: null,
+        personagens: [],
         participacoes: [],
         caracteristicas: [],
         observacoes: "",
@@ -91,12 +91,12 @@ function ConteudoPerfil() {
       buscarObservacoes(id),
       buscarCaracteristicasAtribuidas(),
     ]);
-    const personagem = peca ? await buscarPersonagemDaPessoa(peca.id, id) : null;
+    const personagens = peca ? await listarPersonagensDaPessoa(peca.id, id) : [];
     return {
       // Mesclado aqui: o documento da pessoa não guarda mais a avaliação.
       pessoa: pessoa ? { ...pessoa, caracteristicas: atribuidas.pessoas[id] ?? [] } : null,
       peca,
-      personagem,
+      personagens,
       participacoes,
       caracteristicas,
       observacoes: notas?.observacoes ?? "",
@@ -121,7 +121,7 @@ function ConteudoPerfil() {
   const pessoa = dados.dados?.pessoa ?? null;
   const traits = dados.dados?.caracteristicas ?? [];
   const participacoes = dados.dados?.participacoes ?? [];
-  const personagem = dados.dados?.personagem ?? null;
+  const personagens = dados.dados?.personagens ?? [];
   const observacoesAtuais = dados.dados?.observacoes ?? "";
 
   function abrirEdicao() {
@@ -243,10 +243,13 @@ function ConteudoPerfil() {
           </Status>
           {/* Sem acesso vinculado a pessoa não vê nada do próprio no app. */}
           <AcessoDaPessoa personId={id} />
-          {personagem ? (
-            <Tag tom="areia">
-              {personagem.nome} · {ROLE_TYPE_LABEL[personagem.tipoPapel]}
-            </Tag>
+          {personagens.length > 0 ? (
+            /* Uma etiqueta por papel: quem acumula aparece com todos. */
+            personagens.map((papel) => (
+              <Tag key={papel.id} tom="areia">
+                {papel.nome} · {ROLE_TYPE_LABEL[papel.tipoPapel]}
+              </Tag>
+            ))
           ) : (
             <Tag>Não escalada na peça atual</Tag>
           )}

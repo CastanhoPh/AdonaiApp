@@ -6,9 +6,9 @@ import { CalendarDots, CaretRight, Certificate, Scroll } from "@phosphor-icons/r
 import { useAuth } from "@/lib/auth-context";
 import {
   buscarPecaAtual,
-  buscarPersonagemDaPessoa,
+  listarPersonagensDaPessoa,
   listarEnsaios,
-  listarFalasDoPersonagem,
+  listarFalas,
   listarParticipacoes,
 } from "@/lib/db";
 import {
@@ -62,7 +62,7 @@ const TOM_PECA = {
 
 interface TelaInicio {
   peca: Play | null;
-  personagem: Character | null;
+  personagens: Character[];
   ensaios: Rehearsal[];
   pecas: number;
   falas: number;
@@ -80,7 +80,7 @@ export default function Inicio() {
   const tela = useCarregar<TelaInicio>("inicio", async () => {
     const vazio: TelaInicio = {
       peca: null,
-      personagem: null,
+      personagens: [],
       ensaios: [],
       pecas: 0,
       falas: 0,
@@ -93,18 +93,21 @@ export default function Inicio() {
     ]);
     if (!peca) return { ...vazio, pecas: participacoes.length };
 
-    const [personagem, ensaios] = await Promise.all([
-      buscarPersonagemDaPessoa(peca.id, pessoa.id),
+    const [personagens, ensaios] = await Promise.all([
+      listarPersonagensDaPessoa(peca.id, pessoa.id),
       listarEnsaios(peca.id),
     ]);
 
-    const minhas = personagem
-      ? await listarFalasDoPersonagem(peca.id, personagem.id)
+    // Falas de todos os papéis: quem acumula precisa ver a conta somada.
+    const minhas = personagens.length > 0
+      ? (await listarFalas(peca.id)).filter(
+          (f) => f.characterId && personagens.some((c) => c.id === f.characterId),
+        )
       : [];
 
     return {
       peca,
-      personagem,
+      personagens,
       ensaios,
       pecas: participacoes.length,
       falas: minhas.filter((f) => f.tipo === "fala").length,
@@ -112,7 +115,9 @@ export default function Inicio() {
   }, [pessoa?.id]);
 
   const peca = tela.dados?.peca ?? null;
-  const personagem = tela.dados?.personagem ?? null;
+  const personagens = tela.dados?.personagens ?? [];
+  // O cartão mostra o papel principal; os outros entram como contagem.
+  const personagem = personagens[0] ?? null;
 
   const proximo = useMemo(() => {
     const hoje = hojeISO();
@@ -174,12 +179,18 @@ export default function Inicio() {
 
               <Divisor className="my-3.5" />
 
-              <Eyebrow>Seu personagem</Eyebrow>
+              <Eyebrow>{personagens.length > 1 ? "Seus personagens" : "Seu personagem"}</Eyebrow>
               <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
                 <h3 className="text-[20px] leading-6 font-bold text-ink-heading">
                   {personagem.nome}
                 </h3>
                 <Tag tom="areia">{ROLE_TYPE_LABEL[personagem.tipoPapel]}</Tag>
+                {personagens.length > 1 ? (
+                  <Tag>
+                    +{personagens.length - 1}{" "}
+                    {personagens.length - 1 === 1 ? "outro papel" : "outros papéis"}
+                  </Tag>
+                ) : null}
               </div>
               {personagem.descricao ? (
                 <p className="mt-2 text-[14px] leading-[21px] text-ink-body">

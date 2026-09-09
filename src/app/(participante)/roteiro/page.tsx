@@ -60,7 +60,20 @@ export default function Roteiro() {
   const { pessoa } = useAuth();
   const atual = useAtual();
   const peca = atual.dados?.peca ?? null;
-  const personagem = atual.dados?.personagem ?? null;
+  /*
+   * O destaque das falas considera todos os papéis da pessoa na peça: quem faz
+   * três personagens precisa ver as falas dos três em destaque, não de um.
+   */
+  const personagens = atual.dados?.personagens;
+  /*
+   * Memorizado porque entra nas dependências do índice de falas abaixo: um Set
+   * novo a cada render faria o índice inteiro ser recalculado sem necessidade.
+   */
+  const meusIds = useMemo(
+    () => new Set((personagens ?? []).map((p) => p.id)),
+    [personagens],
+  );
+  const personagem = personagens?.[0] ?? null;
 
   const falas = useCarregar<ScriptLine[]>("roteiro-falas",
     async () => (peca ? listarFalas(peca.id) : []),
@@ -76,8 +89,10 @@ export default function Roteiro() {
   // Índice global das falas do usuário, base do navegador do rodapé.
   const minhasFalas = useMemo(
     () =>
-      personagem ? lista.filter((f) => f.tipo === "fala" && f.characterId === personagem.id) : [],
-    [lista, personagem],
+      meusIds.size > 0
+        ? lista.filter((f) => f.tipo === "fala" && f.characterId && meusIds.has(f.characterId))
+        : [],
+    [lista, meusIds],
   );
 
   const [indice, setIndice] = useState(-1);
@@ -282,7 +297,7 @@ export default function Roteiro() {
 
                 {ato.cenas.map((cena) => {
                   const minhasNaCena = personagem
-                    ? cena.falas.filter((f) => f.tipo === "fala" && f.characterId === personagem.id)
+                    ? cena.falas.filter((f) => f.tipo === "fala" && f.characterId && meusIds.has(f.characterId))
                         .length
                     : 0;
                   const visiveis = cena.falas.filter(combina);
