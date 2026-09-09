@@ -17,7 +17,8 @@
     "claims": "node scripts/sincronizar-claims.mjs",
     "nomes": "node scripts/alinhar-nomes.mjs",
     "pecas-antigas": "node scripts/subir-pecas-antigas.mjs",
-    "corrigir-pecas": "node scripts/corrigir-pecas.mjs"
+    "corrigir-pecas": "node scripts/corrigir-pecas.mjs",
+    "elenco": "node scripts/subir-elenco.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
