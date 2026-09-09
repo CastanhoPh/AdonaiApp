@@ -166,6 +166,16 @@ export interface Play {
   /** Onde a peça será apresentada. Ex.: "Templo sede". */
   local: string;
   status: PlayStatus;
+  /**
+   * Elenco fechado: a escalação está definida e não se procura mais gente.
+   *
+   * Separado de `status` de propósito. O status conta em que fase a produção
+   * está; isto responde outra pergunta, que é a que o grupo faz: "ainda dá
+   * para entrar nessa peça?". Peça em ensaio pode ter elenco fechado, e peça
+   * concluída do acervo pode estar em aberto porque ninguém lembrou quem fez o
+   * quê. Ausente significa em aberto — é o estado de quem acabou de nascer.
+   */
+  elencoFechado?: boolean;
   /** Apenas uma peça pode ser a atual (regra 7 do briefing). */
   atual: boolean;
   roteiroVersao: number;

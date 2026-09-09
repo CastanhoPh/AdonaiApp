@@ -248,6 +248,10 @@ function ItemPeca({
 
             <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
               <Status tom={TOM_STATUS[peca.status]}>{PLAY_STATUS_LABEL[peca.status]}</Status>
+              {/* Responde "ainda dá para entrar nessa peça?", que o status não responde. */}
+              <Tag tom={peca.elencoFechado ? "neutro" : "areia"}>
+                {peca.elencoFechado ? "Elenco fechado" : "Elenco em aberto"}
+              </Tag>
               {peca.dataApresentacao ? (
                 <span className="text-[12px] leading-[18px] text-ink-caption">
                   {dataLonga(peca.dataApresentacao)}

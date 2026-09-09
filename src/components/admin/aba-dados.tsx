@@ -7,6 +7,7 @@ import { useEnvio } from "@/lib/hooks";
 import { LADO_CENA, caminhoDaCapaDaPeca } from "@/lib/armazenamento";
 import { PLAY_STATUS, PLAY_STATUS_LABEL, type Play, type PlayStatus } from "@/lib/types";
 import {
+  Caixa,
   AreaTexto,
   Aviso,
   Botao,
@@ -36,6 +37,7 @@ export function AbaDados({
     nomeEvento: peca.nomeEvento ?? "",
     descricao: peca.descricao ?? "",
     capaUrl: peca.capaUrl ?? "",
+    elencoFechado: peca.elencoFechado ?? false,
     dataApresentacao: peca.dataApresentacao ?? "",
     local: peca.local ?? "",
     status: peca.status,
@@ -63,6 +65,7 @@ export function AbaDados({
         nomeEvento: form.nomeEvento.trim(),
         descricao: form.descricao.trim(),
         capaUrl: form.capaUrl.trim(),
+        elencoFechado: form.elencoFechado,
         dataApresentacao: form.dataApresentacao,
         local: form.local.trim(),
         status: form.status as PlayStatus,
@@ -153,6 +156,20 @@ export function AbaDados({
               ))}
             </Selecao>
           </Campo>
+
+          {/*
+            * Separado do status de propósito: status é a fase da produção,
+            * isto responde "ainda dá para entrar nessa peça?".
+            */}
+          <div className="-mx-2">
+            <Caixa
+              marcada={form.elencoFechado}
+              onClick={() => setForm({ ...form, elencoFechado: !form.elencoFechado })}
+              descricao="Marque quando a escalação estiver definida. Em aberto significa que ainda falta gente ou falta lembrar quem fez o quê."
+            >
+              Elenco fechado
+            </Caixa>
+          </div>
 
           {erro ? <Aviso>{erro}</Aviso> : null}
           {salvo ? <Aviso tom="positivo">Dados salvos.</Aviso> : null}

@@ -165,6 +165,9 @@ function ConteudoPeca() {
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <VoltarPara href="/admin/pecas" rotulo="Peças" />
           {peca.atual ? <Tag tom="areia">Peça atual</Tag> : null}
+          <Tag tom={peca.elencoFechado ? "neutro" : "areia"}>
+            {peca.elencoFechado ? "Elenco fechado" : "Elenco em aberto"}
+          </Tag>
           <Tag tom={peca.roteiroPublicado ? "positivo" : "neutro"}>
             {peca.roteiroPublicado
               ? `Roteiro v${peca.roteiroVersao} publicado${
