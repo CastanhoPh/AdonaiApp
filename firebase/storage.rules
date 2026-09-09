@@ -1,26 +1,65 @@
 rules_version = '2';
 
-// Arquivos do AdonaiApp: fotos de integrantes, capas de peças e imagens de
-// personagens. Leitura para quem está autenticado; envio apenas pela direção.
+// Arquivos do AdonaiApp.
+//
+//   atores/{personId}/perfil.jpg              foto de quem faz parte do grupo
+//   pecas/{playId}/capa.jpg                   capa da peça
+//   pecas/{playId}/{characterId}/foto.jpg      imagem do personagem
+//
+// Leitura para quem está autenticado: o elenco precisa ver os rostos uns dos
+// outros na convocação e no elenco da peça.
+//
+// Escrita: a direção em tudo, e cada pessoa na própria foto de perfil — trocar
+// o próprio retrato não deveria depender de pedir para a direção.
 service firebase.storage {
   match /b/{bucket}/o {
     function autenticado() {
       return request.auth != null;
     }
 
+    /*
+     * Quem é a pessoa vem do próprio token, não de uma consulta ao Firestore.
+     *
+     * A regra é avaliada em toda requisição de envio; consultar o Firestore ali
+     * custaria uma leitura por arquivo e amarraria o Storage a outro serviço.
+     * `sincronizarClaims`, nas Cloud Functions, mantém `role` e `personId` do
+     * token iguais ao documento em `users/{uid}`.
+     */
     function ehAdmin() {
-      return autenticado()
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return autenticado() && request.auth.token.role == 'admin';
     }
 
-    match /pessoas/{arquivo=**} {
+    function ehAPropriaPessoa(personId) {
+      return autenticado() && request.auth.token.personId == personId;
+    }
+
+    /*
+     * Limites no envio, não só na interface: o cliente reduz a imagem antes de
+     * subir, mas quem chamar a API direto não passa por essa redução. Sem o
+     * teto, uma conta autenticada poderia encher o bucket.
+     */
+    function imagemAceitavel() {
+      return request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType != null
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /atores/{personId}/{arquivo=**} {
       allow read: if autenticado();
-      allow write: if ehAdmin();
+      // `personId` no caminho é o que amarra a foto a quem pode trocá-la.
+      allow write: if imagemAceitavel() && (ehAdmin() || ehAPropriaPessoa(personId));
+      allow delete: if ehAdmin() || ehAPropriaPessoa(personId);
     }
 
     match /pecas/{arquivo=**} {
       allow read: if autenticado();
-      allow write: if ehAdmin();
+      allow write: if ehAdmin() && imagemAceitavel();
+      allow delete: if ehAdmin();
+    }
+
+    // Nada fora dessas duas árvores.
+    match /{outros=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -30,7 +30,6 @@ function pecaVazia() {
   return {
     titulo: "",
     descricao: "",
-    capaUrl: "",
     dataApresentacao: "",
     local: "",
     status: "planejamento" as PlayStatus,
@@ -101,7 +100,7 @@ function ConteudoPecas() {
       await criarPeca({
         titulo: form.titulo.trim(),
         descricao: form.descricao.trim(),
-        capaUrl: form.capaUrl.trim(),
+        capaUrl: "",
         dataApresentacao: form.dataApresentacao,
         local: form.local.trim(),
         status: form.status,
@@ -313,14 +312,10 @@ function FormularioNovaPeca({
             placeholder="Resumo da peça, tema e proposta."
           />
         </Campo>
-        <Campo etiqueta="Link da capa">
-          <Entrada
-            value={form.capaUrl}
-            onChange={(e) => setForm({ ...form, capaUrl: e.target.value })}
-            placeholder="https://…"
-            inputMode="url"
-          />
-        </Campo>
+        {/* A capa mora em pecas/{playId}/, e o id nasce com o Salvar. */}
+        <p className="text-[12px] leading-[18px] text-ink-caption">
+          A capa é enviada depois de salvar, na aba Dados da peça.
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <Campo etiqueta="Data da apresentação">
             <Entrada

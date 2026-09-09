@@ -24,7 +24,9 @@ import {
   type Play,
   type Trait,
 } from "@/lib/types";
+import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
+import { EnviarFoto } from "@/components/comum/enviar-foto";
 import { LinhaParticipacao } from "@/components/comum/participacao-cartao";
 import {
   Abas,
@@ -132,6 +134,15 @@ function ConteudoPerfil() {
       caracteristicas: pessoa.caracteristicas ?? [],
     });
     setEditando(true);
+  }
+
+  /** Foto vai direto para o cadastro; o resto do formulário espera o Salvar. */
+  async function salvarFoto(url: string) {
+    setForm({ ...form, fotoUrl: url });
+    await enviar(async () => {
+      await atualizarPessoa(id, { fotoUrl: url });
+      await dados.recarregar();
+    });
   }
 
   async function salvar() {
@@ -265,11 +276,19 @@ function ConteudoPerfil() {
                   inputMode="tel"
                 />
               </Campo>
-              <Campo etiqueta="Link da foto">
-                <Entrada
-                  value={form.fotoUrl}
-                  onChange={(e) => setForm({ ...form, fotoUrl: e.target.value })}
-                  inputMode="url"
+              <Campo etiqueta="Foto">
+                {/*
+                  * Grava sozinha ao terminar o envio, sem esperar o "Salvar":
+                  * o arquivo já subiu, e deixar a URL pendurada no formulário
+                  * abriria a chance de a foto existir no Storage sem ninguém
+                  * apontando para ela.
+                  */}
+                <EnviarFoto
+                  caminho={caminhoDaFotoDoAtor(id)}
+                  atual={form.fotoUrl}
+                  onEnviada={(url) => salvarFoto(url)}
+                  onRemovida={() => salvarFoto("")}
+                  desabilitado={enviando}
                 />
               </Campo>
               <div className="-mx-2">

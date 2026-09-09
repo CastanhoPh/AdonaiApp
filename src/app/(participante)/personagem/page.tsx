@@ -98,13 +98,27 @@ export default function MeuPersonagem() {
       <TopoParticipante titulo="Meu personagem" voltarPara="/inicio" />
 
       {/* Hero do personagem */}
-      <Cartao className="relative mb-4 overflow-hidden bg-surface-raised px-4 py-5">
-        <MarcaAlianca
-          tamanho={120}
-          opacidade={0.07}
-          className="pointer-events-none absolute -top-6 -right-8"
-        />
-        <div className="relative">
+      <Cartao className="relative mb-4 overflow-hidden bg-surface-raised">
+        {/*
+          * Imagem que a direção enviou para o papel: figurino, referência de
+          * cena. Só aparece quando existe — sem ela o hero fica como era, com
+          * a marca em watermark.
+          */}
+        {personagem.imagemUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={personagem.imagemUrl}
+            alt={`Referência de ${personagem.nome}`}
+            className="h-44 w-full border-b border-stroke-frame object-cover"
+          />
+        ) : (
+          <MarcaAlianca
+            tamanho={120}
+            opacidade={0.07}
+            className="pointer-events-none absolute -top-6 -right-8"
+          />
+        )}
+        <div className="relative px-4 py-5">
           <Eyebrow>{peca.titulo}</Eyebrow>
           <h2 className="mt-2 text-[32px] leading-[38px] font-bold text-ink-heading">
             {personagem.nome}

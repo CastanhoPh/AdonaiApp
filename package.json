@@ -13,7 +13,8 @@
     "participante": "node scripts/participante.mjs",
     "seed": "node scripts/seed.mjs",
     "avisos": "node scripts/enviar-avisos.mjs",
-    "segmentos": "node scripts/corrigir-segmentos.mjs"
+    "segmentos": "node scripts/corrigir-segmentos.mjs",
+    "claims": "node scripts/sincronizar-claims.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

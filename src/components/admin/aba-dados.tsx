@@ -4,6 +4,7 @@ import { useState } from "react";
 import { atualizarPeca, concluirPeca, definirPecaAtual } from "@/lib/db";
 import { dataLonga, hojeISO, pluralizar } from "@/lib/format";
 import { useEnvio } from "@/lib/hooks";
+import { LADO_CENA, caminhoDaCapaDaPeca } from "@/lib/armazenamento";
 import { PLAY_STATUS, PLAY_STATUS_LABEL, type Play, type PlayStatus } from "@/lib/types";
 import {
   AreaTexto,
@@ -17,6 +18,7 @@ import {
   Selecao,
   TituloSecao,
 } from "@/components/ui";
+import { EnviarFoto } from "@/components/comum/enviar-foto";
 
 export function AbaDados({
   peca,
@@ -39,6 +41,14 @@ export function AbaDados({
   });
   const [salvo, setSalvo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+
+  async function salvarCapa(url: string) {
+    setForm({ ...form, capaUrl: url });
+    await enviar(async () => {
+      await atualizarPeca(peca.id, { capaUrl: url });
+      await onAtualizar();
+    });
+  }
 
   async function salvar() {
     setSalvo(false);
@@ -93,12 +103,17 @@ export function AbaDados({
               onChange={(e) => setForm({ ...form, descricao: e.target.value })}
             />
           </Campo>
-          <Campo etiqueta="Link da capa">
-            <Entrada
-              value={form.capaUrl}
-              onChange={(e) => setForm({ ...form, capaUrl: e.target.value })}
-              placeholder="https://…"
-              inputMode="url"
+          <Campo etiqueta="Capa da peça">
+            {/* Grava na hora: o arquivo já subiu, ver aba-personagens. */}
+            <EnviarFoto
+              caminho={caminhoDaCapaDaPeca(peca.id)}
+              atual={form.capaUrl}
+              ladoMaximo={LADO_CENA}
+              formato="retangulo"
+              rotulo="Escolher capa"
+              onEnviada={(url) => salvarCapa(url)}
+              onRemovida={() => salvarCapa("")}
+              desabilitado={enviando}
             />
           </Campo>
           <div className="grid grid-cols-2 gap-3">

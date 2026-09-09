@@ -55,7 +55,6 @@ function pessoaVazia() {
     nome: "",
     email: "",
     telefone: "",
-    fotoUrl: "",
     ativo: true,
     caracteristicas: [] as string[],
   };
@@ -168,7 +167,7 @@ export default function Pessoas() {
         nome: form.nome.trim(),
         email: form.email.trim(),
         telefone: form.telefone.trim(),
-        fotoUrl: form.fotoUrl.trim(),
+        fotoUrl: "",
         ativo: form.ativo,
         caracteristicas: form.caracteristicas,
       });
@@ -465,14 +464,13 @@ export default function Pessoas() {
               inputMode="tel"
             />
           </Campo>
-          <Campo etiqueta="Link da foto">
-            <Entrada
-              value={form.fotoUrl}
-              onChange={(e) => setForm({ ...form, fotoUrl: e.target.value })}
-              placeholder="https://…"
-              inputMode="url"
-            />
-          </Campo>
+          {/*
+            * Sem foto aqui de propósito: o arquivo mora em atores/{personId}/
+            * no Storage, e o id só existe depois de salvar.
+            */}
+          <p className="text-[12px] leading-[18px] text-ink-caption">
+            A foto é enviada depois de salvar, na tela da pessoa.
+          </p>
 
           <div>
             <p className="mb-1.5 text-[12px] leading-[18px] text-ink-caption">

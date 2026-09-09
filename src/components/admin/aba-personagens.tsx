@@ -10,6 +10,7 @@ import {
 } from "@/lib/db";
 import { nomeCurto } from "@/lib/format";
 import { useEnvio } from "@/lib/hooks";
+import { LADO_CENA, caminhoDaFotoDoPersonagem } from "@/lib/armazenamento";
 import { ROLE_TYPES, ROLE_TYPE_LABEL, type Character, type RoleType, type Trait } from "@/lib/types";
 import {
   AreaTexto,
@@ -27,6 +28,7 @@ import {
   TituloSecao,
   Vazio,
 } from "@/components/ui";
+import { EnviarFoto } from "@/components/comum/enviar-foto";
 
 function personagemVazio() {
   return {
@@ -78,6 +80,16 @@ export function AbaPersonagens({
     });
     definirErro(null);
     setAberto(true);
+  }
+
+  /** A imagem já subiu; gravar na hora evita arquivo sem ninguém apontando. */
+  async function salvarImagem(url: string) {
+    if (!editandoId) return;
+    setForm({ ...form, imagemUrl: url });
+    await enviar(async () => {
+      await atualizarPersonagem(playId, editandoId, { imagemUrl: url });
+      await onAtualizar();
+    });
   }
 
   async function salvar() {
@@ -162,7 +174,16 @@ export function AbaPersonagens({
               <li key={personagem.id}>
                 <Cartao className="px-4 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    {/* Miniatura para a direção conferir de relance qual papel já tem imagem. */}
+                    {personagem.imagemUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={personagem.imagemUrl}
+                        alt=""
+                        className="h-14 w-20 shrink-0 rounded-[8px] border border-stroke-frame object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
                       <p className="text-[15px] leading-[22px] font-bold text-ink-heading">
                         {personagem.nome}
                       </p>
@@ -305,13 +326,28 @@ export function AbaPersonagens({
               placeholder="Orientações de interpretação, figurino, marcações…"
             />
           </Campo>
-          <Campo etiqueta="Link da imagem do personagem">
-            <Entrada
-              value={form.imagemUrl}
-              onChange={(e) => setForm({ ...form, imagemUrl: e.target.value })}
-              placeholder="https://…"
-              inputMode="url"
-            />
+          <Campo etiqueta="Imagem do personagem">
+            {/*
+              * O arquivo mora em pecas/{playId}/{characterId}/, e o id do
+              * personagem só existe depois de salvar — por isso a imagem só
+              * aparece na edição. Em cena mais larga que retrato, daí LADO_CENA.
+              */}
+            {editandoId ? (
+              <EnviarFoto
+                caminho={caminhoDaFotoDoPersonagem(playId, editandoId)}
+                atual={form.imagemUrl}
+                ladoMaximo={LADO_CENA}
+                formato="retangulo"
+                rotulo="Escolher imagem"
+                onEnviada={(url) => salvarImagem(url)}
+                onRemovida={() => salvarImagem("")}
+                desabilitado={enviando}
+              />
+            ) : (
+              <p className="text-[12px] leading-[18px] text-ink-caption">
+                A imagem é enviada depois de salvar o personagem.
+              </p>
+            )}
           </Campo>
           {erro ? <Aviso>{erro}</Aviso> : null}
         </div>

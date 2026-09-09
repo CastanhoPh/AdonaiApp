@@ -16,8 +16,9 @@
  * em laço vire fatura no plano Blaze.
  */
 import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { enviarAviso } from "./avisos.js";
@@ -111,5 +112,40 @@ export const lembrarDosEnsaios = onSchedule(
       await ensaio.ref.update({ lembreteEm: new Date().toISOString() });
       logger.info("lembrete criado", { ensaioId: ensaio.id, data: amanha });
     }
+  },
+);
+
+/**
+ * Espelha `role` e `personId` da conta nas claims do token.
+ *
+ * As regras do Storage precisam saber quem é a pessoa para deixá-la trocar a
+ * própria foto, e o caminho do arquivo usa `personId`. A alternativa era a
+ * regra consultar o Firestore a cada envio — o que custa uma leitura por
+ * requisição e depende de acesso entre serviços. Claim no token é resolvido
+ * pelo próprio Firebase Auth, sem leitura nenhuma.
+ *
+ * Roda em qualquer escrita em `users/{uid}`, que é onde `role` e `personId`
+ * mudam: promover alguém a administrador ou vincular a conta à pessoa
+ * cadastrada. Compara antes de gravar, senão a própria gravação de claim
+ * dispararia o gatilho de novo.
+ */
+export const sincronizarClaims = onDocumentWritten(
+  { ...COMUM, document: "users/{uid}" },
+  async (evento) => {
+    const uid = evento.params.uid;
+    const depois = evento.data?.after?.data();
+    if (!depois) return;
+
+    const desejado = {
+      role: depois.role ?? "participante",
+      personId: depois.personId ?? null,
+    };
+
+    const usuario = await getAuth().getUser(uid);
+    const atual = usuario.customClaims ?? {};
+    if (atual.role === desejado.role && (atual.personId ?? null) === desejado.personId) return;
+
+    await getAuth().setCustomUserClaims(uid, { ...atual, ...desejado });
+    logger.info("claims sincronizadas", { uid, ...desejado });
   },
 );

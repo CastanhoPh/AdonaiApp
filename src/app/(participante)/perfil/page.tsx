@@ -7,21 +7,21 @@ import { useAuth } from "@/lib/auth-context";
 import { atualizarPessoa, listarParticipacoes } from "@/lib/db";
 import { ano, ehMenorDeIdade, idade, nomeCurto, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
+import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
 import { reabrirGuia } from "@/lib/instalacao";
 import { useAtual } from "@/lib/uso-atual";
 import { MAIORIDADE, ROLE_TYPE_LABEL, type Participation } from "@/lib/types";
 import { TopoAba } from "@/components/shell";
 import { FormularioCadastro } from "@/components/acesso/cadastro-pessoa";
+import { EnviarFoto } from "@/components/comum/enviar-foto";
 import { ControleNotificacoes } from "@/components/comum/notificacoes";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
 import {
   Avatar,
   Aviso,
   Botao,
-  Campo,
   Cartao,
   Divisor,
-  Entrada,
   Eyebrow,
   Status,
   Tag,
@@ -46,26 +46,21 @@ export default function Perfil() {
   const [editando, setEditando] = useState<"nada" | "dados" | "foto">(
     pessoa && !pessoa.cadastroCompletoEm ? "dados" : "nada",
   );
-  const [fotoUrl, setFotoUrl] = useState("");
   const [salvo, setSalvo] = useState(false);
 
   function abrirFoto() {
-    setFotoUrl(pessoa?.fotoUrl ?? "");
     setSalvo(false);
     setEditando("foto");
   }
 
-  async function salvarFoto(evento: React.FormEvent) {
-    evento.preventDefault();
-    const ok = await enviar(async () => {
+  /** Grava a URL que o Storage devolveu e recarrega a sessão para o avatar trocar. */
+  async function guardarFoto(url: string) {
+    await enviar(async () => {
       if (!pessoa) return;
-      await atualizarPessoa(pessoa.id, { fotoUrl: fotoUrl.trim() });
+      await atualizarPessoa(pessoa.id, { fotoUrl: url });
       await recarregar();
     });
-    if (ok) {
-      setEditando("nada");
-      setSalvo(true);
-    }
+    setSalvo(true);
   }
 
   function reverTutorial() {
@@ -140,25 +135,20 @@ export default function Perfil() {
             />
           </div>
         ) : editando === "foto" ? (
-          <form onSubmit={salvarFoto} className="mt-4 space-y-3 border-t border-stroke-frame pt-4">
-            <Campo etiqueta="Link da foto" dica="Cole o endereço de uma imagem sua.">
-              <Entrada
-                value={fotoUrl}
-                onChange={(e) => setFotoUrl(e.target.value)}
-                placeholder="https://…"
-                inputMode="url"
-              />
-            </Campo>
+          <div className="mt-4 space-y-3 border-t border-stroke-frame pt-4">
+            <EnviarFoto
+              caminho={caminhoDaFotoDoAtor(pessoa.id)}
+              atual={pessoa.fotoUrl}
+              rotulo="Escolher da galeria"
+              onEnviada={guardarFoto}
+              onRemovida={() => guardarFoto("")}
+              desabilitado={enviando}
+            />
             {erro ? <Aviso>{erro}</Aviso> : null}
-            <div className="flex gap-2">
-              <Botao type="submit" disabled={enviando}>
-                {enviando ? "Salvando…" : "Salvar"}
-              </Botao>
-              <Botao type="button" variante="bare" onClick={() => setEditando("nada")}>
-                Cancelar
-              </Botao>
-            </div>
-          </form>
+            <Botao type="button" variante="bare" onClick={() => setEditando("nada")}>
+              Concluir
+            </Botao>
+          </div>
         ) : (
           <div className="mt-4 flex flex-wrap gap-2">
             <Botao variante="ghost" onClick={() => setEditando("dados")}>

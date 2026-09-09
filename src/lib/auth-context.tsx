@@ -55,6 +55,29 @@ async function vincularPessoa(conta: UserAccount): Promise<UserAccount> {
   return atualizada;
 }
 
+/**
+ * Garante que o token carregue `role` e `personId` como claims.
+ *
+ * As regras do Storage leem essas duas do token para decidir quem troca qual
+ * foto. Quem as grava é a função `sincronizarClaims`, mas o token que o
+ * navegador já tem em mãos não muda sozinho: sem forçar a renovação, a claim
+ * nova só apareceria na próxima hora, e até lá o envio de foto seria negado.
+ *
+ * A comparação evita renovar a cada abertura — só quando o token está de fato
+ * atrasado em relação à conta.
+ */
+async function alinharToken(user: User, conta: UserAccount): Promise<void> {
+  try {
+    const claims = (await user.getIdTokenResult()).claims;
+    const desatualizado =
+      claims.role !== conta.role || (claims.personId ?? null) !== (conta.personId ?? null);
+    if (desatualizado) await user.getIdToken(true);
+  } catch (erro) {
+    // Sem token renovado o app funciona; só o envio de foto pode recusar.
+    console.error("Falha ao renovar o token:", erro);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Sem as chaves do Firebase não há o que carregar.
   const [carregando, setCarregando] = useState(firebaseConfigurado);
@@ -82,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     registro = await vincularPessoa(registro);
+    await alinharToken(user, registro);
     setConta(registro);
     setPessoa(registro.personId ? await buscarPessoa(registro.personId) : null);
   }, []);
