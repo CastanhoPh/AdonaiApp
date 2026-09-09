@@ -158,10 +158,6 @@ export default function Pessoas() {
       definirErro("Informe o nome.");
       return;
     }
-    if (!form.email.trim()) {
-      definirErro("Informe o e-mail — é ele que vincula a pessoa à conta de acesso.");
-      return;
-    }
     const ok = await enviar(async () => {
       await criarPessoa({
         nome: form.nome.trim(),
@@ -366,9 +362,17 @@ export default function Pessoas() {
                                 )}
                               </span>
                             ))}
-                            <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
-                              {pessoa.ativo ? "Ativo" : "Inativo"}
-                            </Status>
+                            <span className="flex flex-wrap items-center gap-2">
+                              <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
+                                {pessoa.ativo ? "Ativo" : "Inativo"}
+                              </Status>
+                              {/*
+                                * Sem e-mail a pessoa nunca será encontrada
+                                * quando criar a conta. Precisa ficar à vista,
+                                * senão o vínculo não acontece por esquecimento.
+                                */}
+                              {!pessoa.email ? <Tag tom="aviso">Sem e-mail</Tag> : null}
+                            </span>
                           </div>
                         );
                       })}
@@ -399,6 +403,7 @@ export default function Pessoas() {
                                   <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
                                     {pessoa.ativo ? "Ativo" : "Inativo"}
                                   </Status>
+                                  {!pessoa.email ? <Tag tom="aviso">Sem e-mail</Tag> : null}
                                   {marcadas.map((t) => (
                                     <Tag key={t.id} tom="info">
                                       {t.nome}
@@ -443,10 +448,16 @@ export default function Pessoas() {
               placeholder="Nome do integrante"
             />
           </Campo>
+          {/*
+            * E-mail deixou de ser exigido para o acervo antigo poder entrar:
+            * quem atuou em 2024 pode não ter e-mail à mão, e travar o cadastro
+            * nisso significa não registrar a peça. Sem e-mail a pessoa existe
+            * e recebe histórico; só não é encontrada quando ela criar a conta,
+            * até alguém preencher o campo.
+            */}
           <Campo
             etiqueta="E-mail"
-            obrigatorio
-            dica="A conta criada pelo integrante com este e-mail é vinculada automaticamente."
+            dica="É ele que vincula a conta automaticamente quando a pessoa se cadastrar. Pode ficar em branco e ser preenchido depois."
           >
             <Entrada
               type="email"
