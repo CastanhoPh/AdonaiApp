@@ -20,6 +20,17 @@ import { db } from "./firebase-admin-app.mjs";
  * A peça é encontrada por título — único no acervo.
  */
 const CORRECOES = [
+  /*
+   * Título trocado: a peça de Convenção 2024 é a história de Moisés, não a de
+   * José do Egito. Com acento, seguindo o pedido de corrigir o português —
+   * "Moises" veio sem acento na lista, como "Pascoa".
+   */
+  {
+    titulo: "A História de José do Egito",
+    campo: "titulo",
+    de: "A História de José do Egito",
+    para: "A História de Moisés",
+  },
   { titulo: "Ele É", campo: "nomeEvento", de: "Pascoa 2024", para: "Páscoa 2024" },
   { titulo: "A Recompensa", campo: "nomeEvento", de: "Pascoa 2025", para: "Páscoa 2025" },
   { titulo: "Está Consumado", campo: "nomeEvento", de: "Pascoa 2026", para: "Páscoa 2026" },
