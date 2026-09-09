@@ -27,7 +27,7 @@ import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/component
 import { AbaDados } from "@/components/admin/aba-dados";
 import { AbaElenco } from "@/components/admin/aba-elenco";
 import { AbaPersonagens } from "@/components/admin/aba-personagens";
-import { Abas, BotaoLink, Carregando, Tag, Vazio } from "@/components/ui";
+import { Abas, Carregando, Tag, Vazio } from "@/components/ui";
 
 type Aba = "dados" | "personagens" | "elenco";
 
@@ -156,19 +156,6 @@ function ConteudoPeca() {
         ]
           .filter(Boolean)
           .join(" · ")}
-        acoes={
-          <>
-            <BotaoLink href={`/admin/pecas/roteiro?id=${peca.id}`} variante="ghost" className="gap-1.5">
-              <Scroll size={15} />
-              Editor de roteiro
-            </BotaoLink>
-            <BotaoLink href={`/admin/ensaios?peca=${peca.id}`} variante="ghost" className="gap-1.5">
-              <CalendarDots size={15} />
-              Ensaios
-              {dados.dados?.ensaios ? ` (${dados.dados.ensaios})` : ""}
-            </BotaoLink>
-          </>
-        }
       />
 
       <CorpoAdmin>
@@ -185,6 +172,12 @@ function ConteudoPeca() {
           <Tag>{falas.length} falas cadastradas</Tag>
         </div>
 
+        {/*
+          * Roteiro e Ensaios entram como atalhos, não como abas: são telas
+          * próprias, com editor e formulários que não caberiam aqui dentro. O
+          * ícone marca a diferença — clicar leva para outro lugar em vez de
+          * trocar o conteúdo abaixo.
+          */}
         <Abas
           className="mb-5"
           abas={[
@@ -194,6 +187,19 @@ function ConteudoPeca() {
           ]}
           ativa={aba}
           onTrocar={setAbaEscolhida}
+          atalhos={[
+            {
+              href: `/admin/pecas/roteiro?id=${peca.id}`,
+              rotulo: "Editor de roteiro",
+              icone: <Scroll size={15} />,
+            },
+            {
+              href: `/admin/ensaios?peca=${peca.id}`,
+              rotulo: "Ensaios",
+              contagem: dados.dados?.ensaios,
+              icone: <CalendarDots size={15} />,
+            },
+          ]}
         />
 
         {aba === "dados" ? (

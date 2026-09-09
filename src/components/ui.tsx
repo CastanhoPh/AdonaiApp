@@ -646,45 +646,75 @@ export function Modal({
 
 /* ------------------------------------------------------------------- abas */
 
-/** Abas com sublinhado; a ativa fica em areia. */
+const ITEM_DE_ABA =
+  "-mb-px flex shrink-0 items-center gap-1.5 border-b-2 pb-2.5 text-[13px] font-medium whitespace-nowrap transition-colors";
+const ABA_APAGADA = "border-transparent text-ink-caption hover:text-ink-heading";
+
+/**
+ * Abas com sublinhado; a ativa fica em areia.
+ *
+ * `atalhos` entram na mesma faixa, à direita das abas, mas são links: levam
+ * para outra tela em vez de trocar o conteúdo abaixo. Ficam fora do `tablist`
+ * de propósito — aba anuncia que controla um painel ali mesmo, e leitor de tela
+ * que anunciasse "aba" para algo que navega estaria mentindo. O ícone é o que
+ * separa os dois grupos para quem está olhando.
+ */
 export function Abas<T extends string>({
   abas,
   ativa,
   onTrocar,
+  atalhos,
   className,
 }: {
   abas: { chave: T; rotulo: string; contagem?: number }[];
   ativa: T;
   onTrocar: (chave: T) => void;
+  atalhos?: { href: string; rotulo: string; contagem?: number; icone?: ReactNode }[];
   className?: string;
 }) {
   return (
     <div
-      role="tablist"
-      className={juntar("sem-barra flex gap-5 overflow-x-auto border-b border-stroke-frame", className)}
+      className={juntar(
+        "sem-barra flex gap-5 overflow-x-auto border-b border-stroke-frame",
+        className,
+      )}
     >
-      {abas.map((aba) => {
-        const selecionada = ativa === aba.chave;
-        return (
-          <button
-            key={aba.chave}
-            role="tab"
-            aria-selected={selecionada}
-            onClick={() => onTrocar(aba.chave)}
-            className={juntar(
-              "-mb-px shrink-0 border-b-2 pb-2.5 text-[13px] font-medium whitespace-nowrap transition-colors",
-              selecionada
-                ? "border-brand text-ink-heading"
-                : "border-transparent text-ink-caption hover:text-ink-heading",
-            )}
-          >
-            {aba.rotulo}
-            {typeof aba.contagem === "number" ? (
-              <span className="fonte-num ml-1.5 text-[12px] text-ink-caption">{aba.contagem}</span>
-            ) : null}
-          </button>
-        );
-      })}
+      <div role="tablist" className="flex gap-5">
+        {abas.map((aba) => {
+          const selecionada = ativa === aba.chave;
+          return (
+            <button
+              key={aba.chave}
+              role="tab"
+              aria-selected={selecionada}
+              onClick={() => onTrocar(aba.chave)}
+              className={juntar(
+                ITEM_DE_ABA,
+                selecionada ? "border-brand text-ink-heading" : ABA_APAGADA,
+              )}
+            >
+              {aba.rotulo}
+              {typeof aba.contagem === "number" ? (
+                <span className="fonte-num text-[12px] text-ink-caption">{aba.contagem}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {atalhos?.map((atalho) => (
+        <Link
+          key={atalho.href}
+          href={atalho.href}
+          className={juntar(ITEM_DE_ABA, ABA_APAGADA)}
+        >
+          {atalho.icone}
+          {atalho.rotulo}
+          {typeof atalho.contagem === "number" ? (
+            <span className="fonte-num text-[12px] text-ink-caption">{atalho.contagem}</span>
+          ) : null}
+        </Link>
+      ))}
     </div>
   );
 }
