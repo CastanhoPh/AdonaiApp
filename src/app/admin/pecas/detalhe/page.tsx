@@ -153,6 +153,7 @@ function ConteudoPeca() {
         titulo={peca.titulo}
         subtitulo={[
           PLAY_STATUS_LABEL[peca.status],
+          peca.nomeEvento || null,
           peca.dataApresentacao ? dataLonga(peca.dataApresentacao) : null,
           peca.local || null,
         ]

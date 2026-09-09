@@ -33,6 +33,7 @@ export function AbaDados({
   const { enviando, erro, definirErro, enviar } = useEnvio();
   const [form, setForm] = useState({
     titulo: peca.titulo,
+    nomeEvento: peca.nomeEvento ?? "",
     descricao: peca.descricao ?? "",
     capaUrl: peca.capaUrl ?? "",
     dataApresentacao: peca.dataApresentacao ?? "",
@@ -59,6 +60,7 @@ export function AbaDados({
     const ok = await enviar(async () => {
       await atualizarPeca(peca.id, {
         titulo: form.titulo.trim(),
+        nomeEvento: form.nomeEvento.trim(),
         descricao: form.descricao.trim(),
         capaUrl: form.capaUrl.trim(),
         dataApresentacao: form.dataApresentacao,
@@ -95,6 +97,13 @@ export function AbaDados({
             <Entrada
               value={form.titulo}
               onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+            />
+          </Campo>
+          <Campo etiqueta="Nome do evento" dica="Opcional. É o que dá contexto no histórico.">
+            <Entrada
+              value={form.nomeEvento}
+              onChange={(e) => setForm({ ...form, nomeEvento: e.target.value })}
+              placeholder="Ex.: Congresso de Jovens 2026"
             />
           </Campo>
           <Campo etiqueta="Descrição">

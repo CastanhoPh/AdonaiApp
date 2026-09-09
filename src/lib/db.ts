@@ -81,6 +81,7 @@ import type {
   Presenca,
   PresencaEstado,
   Rehearsal,
+  RoleType,
   ScriptLine,
   Trait,
   UserAccount,
@@ -377,6 +378,7 @@ export async function concluirPeca(id: string): Promise<number> {
       personId: personagem.personId as string,
       playId: peca.id,
       playTitulo: peca.titulo,
+      playEvento: peca.nomeEvento ?? "",
       playCapaUrl: peca.capaUrl ?? "",
       characterId: personagem.id,
       characterNome: personagem.nome,
@@ -391,6 +393,93 @@ export async function concluirPeca(id: string): Promise<number> {
   lote.update(doc(db, "plays", id), { status: "concluida", atual: false });
   await lote.commit();
   return novos;
+}
+
+/** Um personagem da peça antiga e quem o fez. */
+export interface PapelAntigo {
+  nome: string;
+  tipoPapel: RoleType;
+  /** Vazio quando não se lembra de quem fez: nada vai para o histórico. */
+  personId: string;
+  personNome: string;
+}
+
+/**
+ * Registra no histórico uma peça que já aconteceu.
+ *
+ * O caminho normal de uma peça é planejamento → escalação → ensaio → conclusão,
+ * e é a conclusão que grava a participação de cada um. Para peça antiga esse
+ * caminho é só trabalho: ninguém vai ensaiar o que já foi apresentado. Aqui a
+ * peça nasce concluída, com os personagens e as participações no mesmo lote —
+ * ou tudo entra, ou nada entra, e não fica peça pela metade no histórico.
+ *
+ * Roteiro não é pedido de propósito: peça antiga raramente tem o texto à mão, e
+ * exigi-lo impediria de registrar o que se lembra.
+ */
+export async function registrarPecaAntiga(dados: {
+  titulo: string;
+  nomeEvento: string;
+  dataApresentacao: string;
+  local: string;
+  descricao: string;
+  papeis: PapelAntigo[];
+}): Promise<{ playId: string; participacoes: number }> {
+  const lote = writeBatch(db);
+  const agora = new Date().toISOString();
+  const pecaRef = doc(collection(db, "plays"));
+
+  lote.set(pecaRef, {
+    titulo: dados.titulo,
+    nomeEvento: dados.nomeEvento,
+    descricao: dados.descricao,
+    capaUrl: "",
+    dataApresentacao: dados.dataApresentacao,
+    local: dados.local,
+    status: "concluida",
+    // Nunca a peça atual: já passou, e só uma peça pode ser a atual.
+    atual: false,
+    roteiroVersao: 0,
+    roteiroPublicado: false,
+    roteiroPublicadoEm: "",
+    roteiroEditadoEm: "",
+    criadoEm: agora,
+  });
+
+  let participacoes = 0;
+  dados.papeis.forEach((papel, ordem) => {
+    const personagemRef = doc(collection(db, "plays", pecaRef.id, "characters"));
+    lote.set(personagemRef, {
+      playId: pecaRef.id,
+      nome: papel.nome,
+      descricao: "",
+      tipoPapel: papel.tipoPapel,
+      observacoes: "",
+      imagemUrl: "",
+      personId: papel.personId || null,
+      personNome: papel.personNome,
+      situacao: papel.personId ? "confirmado" : "pendente",
+      ordem,
+    });
+
+    if (!papel.personId) return;
+    const participacaoRef = doc(collection(db, "participations"));
+    lote.set(participacaoRef, {
+      personId: papel.personId,
+      playId: pecaRef.id,
+      playTitulo: dados.titulo,
+      playEvento: dados.nomeEvento,
+      playCapaUrl: "",
+      characterId: personagemRef.id,
+      characterNome: papel.nome,
+      tipoPapel: papel.tipoPapel,
+      periodo: dados.dataApresentacao,
+      concluidaEm: agora,
+    });
+    participacoes += 1;
+  });
+
+  await lote.commit();
+  return { playId: pecaRef.id, participacoes };
 }
 
 /* ------------------------------------------------------------- personagens */

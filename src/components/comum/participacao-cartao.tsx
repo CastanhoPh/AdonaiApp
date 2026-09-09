@@ -19,6 +19,10 @@ export function LinhaParticipacao({ participacao }: { participacao: Participatio
           {participacao.playTitulo}
         </p>
         <p className="text-[13px] leading-5 text-ink-body">{participacao.characterNome}</p>
+        {/* O evento é o que dá contexto anos depois; só aparece quando houve um. */}
+        {participacao.playEvento ? (
+          <p className="text-[12px] leading-[18px] text-ink-caption">{participacao.playEvento}</p>
+        ) : null}
       </div>
       <Tag className="mt-0.5">{ROLE_TYPE_LABEL[participacao.tipoPapel]}</Tag>
     </li>

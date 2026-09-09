@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowUpRight, PuzzlePiece, Plus } from "@phosphor-icons/react";
+import { ArrowUpRight, ClockCounterClockwise, PuzzlePiece, Plus } from "@phosphor-icons/react";
 import { criarPeca, definirPecaAtual, listarPecas } from "@/lib/db";
 import { dataLonga, hojeISO } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
@@ -13,6 +13,7 @@ import {
   AreaTexto,
   Aviso,
   Botao,
+  BotaoLink,
   Caixa,
   Campo,
   Cartao,
@@ -29,6 +30,7 @@ import {
 function pecaVazia() {
   return {
     titulo: "",
+    nomeEvento: "",
     descricao: "",
     dataApresentacao: "",
     local: "",
@@ -99,6 +101,7 @@ function ConteudoPecas() {
     const ok = await enviar(async () => {
       await criarPeca({
         titulo: form.titulo.trim(),
+        nomeEvento: form.nomeEvento.trim(),
         descricao: form.descricao.trim(),
         capaUrl: "",
         dataApresentacao: form.dataApresentacao,
@@ -124,10 +127,17 @@ function ConteudoPecas() {
         titulo="Peças"
         subtitulo="Cada peça reúne personagens, elenco, roteiro e ensaios."
         acoes={
-          <Botao onClick={abrir} className="gap-1.5">
-            <Plus size={15} />
-            Nova peça
-          </Botao>
+          <>
+            {/* Peça antiga tem caminho próprio: nasce concluída, sem ensaio nem roteiro. */}
+            <BotaoLink href="/admin/pecas/antiga" variante="ghost" className="gap-1.5">
+              <ClockCounterClockwise size={15} />
+              Registrar peça antiga
+            </BotaoLink>
+            <Botao onClick={abrir} className="gap-1.5">
+              <Plus size={15} />
+              Nova peça
+            </Botao>
+          </>
         }
       />
 
@@ -303,6 +313,13 @@ function FormularioNovaPeca({
             value={form.titulo}
             onChange={(e) => setForm({ ...form, titulo: e.target.value })}
             placeholder="Ex.: O Filho Pródigo"
+          />
+        </Campo>
+        <Campo etiqueta="Nome do evento" dica="Opcional. Ex.: Congresso de Jovens 2026.">
+          <Entrada
+            value={form.nomeEvento}
+            onChange={(e) => setForm({ ...form, nomeEvento: e.target.value })}
+            placeholder="Evento em que será apresentada"
           />
         </Campo>
         <Campo etiqueta="Descrição">

@@ -154,6 +154,13 @@ export interface Play {
   titulo: string;
   descricao: string;
   capaUrl: string;
+  /**
+   * Evento em que a peça foi apresentada, quando houve um: "Natal 2024",
+   * "Congresso de Jovens". Opcional porque muita peça é avulsa, e é o que dá
+   * contexto no histórico anos depois — "Rede Mil" diz menos que
+   * "Rede Mil · Congresso de Jovens 2023".
+   */
+  nomeEvento?: string;
   /** Data prevista da apresentação, no formato `YYYY-MM-DD`. */
   dataApresentacao: string;
   /** Onde a peça será apresentada. Ex.: "Templo sede". */
@@ -304,6 +311,8 @@ export interface Participation {
   characterId: string;
   characterNome: string;
   tipoPapel: RoleType;
+  /** Evento da peça, copiado no registro para o histórico não depender dela. */
+  playEvento?: string;
   /** Período/data da apresentação, no formato `YYYY-MM-DD`. */
   periodo: string;
   concluidaEm: string;
