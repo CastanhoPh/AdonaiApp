@@ -11,6 +11,10 @@
  * 2. `lembrarDosEnsaios` — ninguém está com o app aberto às sete da manhã para
  *    lembrar o elenco do ensaio de amanhã. Só um agendador do servidor resolve.
  *
+ * 3. `conferirConvite` e `resgatarConvite` — o convite liga a conta nova à
+ *    ficha de uma pessoa, e deixar o cliente escrever esse vínculo seria
+ *    deixá-lo escolher de quem quer ser. Estão em `convites.js`.
+ *
  * Ambas com `maxInstances` baixo de propósito: é um grupo de teatro de uma
  * igreja, o volume é de dezenas de avisos por mês, e o teto evita que um erro
  * em laço vire fatura no plano Blaze.
@@ -22,6 +26,8 @@ import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/fire
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { enviarAviso } from "./avisos.js";
+
+export { conferirConvite, resgatarConvite } from "./convites.js";
 
 initializeApp();
 

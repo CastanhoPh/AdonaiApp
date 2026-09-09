@@ -11,9 +11,11 @@ import {
   buscarPessoa,
   listarCaracteristicas,
   listarParticipacoes,
+  renomearPessoa,
   salvarObservacoes,
 } from "@/lib/db";
 import { ano, dataLonga, ehMenorDeIdade, idade, nomeCurto, pluralizar } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import {
   MAIORIDADE,
@@ -29,6 +31,7 @@ import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
 import { EnviarFoto } from "@/components/comum/enviar-foto";
 import { AcessoDaPessoa } from "@/components/admin/vincular-acessos";
+import { ConviteDaPessoa } from "@/components/admin/convite-da-pessoa";
 import { LinhaParticipacao } from "@/components/comum/participacao-cartao";
 import {
   Abas,
@@ -72,6 +75,8 @@ export default function PerfilAdministrativo() {
 
 function ConteudoPerfil() {
   const id = useSearchParams().get("id") ?? "";
+  // Quem gerou o convite fica registrado nele.
+  const { conta } = useAuth();
 
   const dados = useCarregar<Dados>("admin-pessoa", async () => {
     if (!id) {
@@ -148,9 +153,17 @@ function ConteudoPerfil() {
   }
 
   async function salvar() {
+    if (!pessoa) return;
     const ok = await enviar(async () => {
+      /*
+       * Nome trocado vai por `renomearPessoa`, que também atualiza as cópias.
+       * O nome do ator aparece copiado em `characters.personNome`, para a tela
+       * de elenco não ler a ficha de cada um, e em `users.nome`. Gravar só na
+       * ficha deixava as duas com o nome antigo — e é na lista de elenco que a
+       * pessoa procura o próprio nome.
+       */
+      if (form.nome.trim() !== pessoa.nome) await renomearPessoa(id, form.nome.trim());
       await atualizarPessoa(id, {
-        nome: form.nome.trim(),
         email: form.email.trim(),
         telefone: form.telefone.trim(),
         fotoUrl: form.fotoUrl.trim(),
@@ -284,6 +297,9 @@ function ConteudoPerfil() {
             <Tag tom="aviso">Cadastro de primeiro acesso pendente</Tag>
           )}
         </div>
+
+        {/* Sem conta ligada, o convite é o próximo passo desta ficha. */}
+        <ConviteDaPessoa pessoa={pessoa} criadoPor={conta?.nome || "direção"} />
 
         {editando ? (
           <Cartao className="mb-5 max-w-xl px-4 py-4">

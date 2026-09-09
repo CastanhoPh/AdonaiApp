@@ -15,6 +15,27 @@ export interface UserAccount {
   criadoEm: string;
 }
 
+/**
+ * Convite de primeiro acesso. Documento em `convites/{codigo}` — o id é o
+ * próprio código, o que dispensa consulta na hora de resgatar e garante que
+ * dois convites nunca nasçam com o mesmo código.
+ */
+export interface Convite {
+  /** O código, em maiúsculas e sem separador. Igual ao id do documento. */
+  codigo: string;
+  /** A ficha que este convite entrega. */
+  personId: string;
+  /** Nome da ficha quando o convite foi gerado, para a direção reconhecer a fila. */
+  personNome: string;
+  criadoPor: string;
+  criadoEm: string;
+  /** Depois disto o código não vale mais. */
+  expiraEm: string;
+  /** Nulo enquanto ninguém resgatou. Um convite serve uma vez. */
+  usadoEm: string | null;
+  usadoPor: string | null;
+}
+
 export const AVISO_ALVOS = ["convocados", "elenco", "todos"] as const;
 export type AvisoAlvo = (typeof AVISO_ALVOS)[number];
 

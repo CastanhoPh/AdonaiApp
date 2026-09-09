@@ -32,29 +32,33 @@ service cloud.firestore {
     // ----------------------------------------------------------- contas
 
     match /users/{uid} {
-      // O vínculo com uma pessoa só é aceito quando o e-mail do cadastro
-      // confere com o e-mail autenticado — evita assumir o perfil de outro.
-      function vinculoValido() {
-        return request.resource.data.personId == null
-          || get(/databases/$(database)/documents/people/$(request.resource.data.personId)).data.email
-             == request.auth.token.email.lower();
-      }
-
       allow get, list: if autenticado() && (request.auth.uid == uid || ehAdmin());
 
-      // Cada integrante cria a própria conta, sempre como participante.
-      // Administradores são promovidos pelo script `npm run admin`.
+      // Cada integrante cria a própria conta, sempre como participante e
+      // sempre sem vínculo. Administradores são promovidos pelo script
+      // `npm run admin`; o vínculo com a ficha é da direção, em Pessoas, ou
+      // vem pronto no convite — que é gravado por função com credencial de
+      // servidor e não passa por aqui.
+      //
+      // Antes esta regra aceitava um `personId` cujo cadastro tivesse o mesmo
+      // e-mail do token. Era o resquício do vínculo automático, que saiu do
+      // app justamente porque atribuía o histórico de alguém por coincidência
+      // de texto num campo que a própria pessoa escolhe.
       allow create: if autenticado()
         && request.auth.uid == uid
         && request.resource.data.role == 'participante'
         && request.resource.data.email == request.auth.token.email.lower()
-        && vinculoValido();
+        && request.resource.data.personId == null;
 
+      // A conta cuida do que é dela — nome, tokens de aviso. `role` e
+      // `personId` ficam como estão: sem isto a pessoa podia zerar o próprio
+      // vínculo e sair da ficha em que a direção a colocou, o que a deixava na
+      // tela de "sem vínculo" e liberava a ficha para um convite novo.
       allow update: if ehAdmin()
         || (autenticado()
             && request.auth.uid == uid
             && request.resource.data.role == resource.data.role
-            && vinculoValido());
+            && request.resource.data.personId == resource.data.personId);
 
       allow delete: if ehAdmin();
     }
@@ -153,6 +157,21 @@ service cloud.firestore {
     // que usa credencial de servidor e não passa por estas regras.
     match /avisos/{avisoId} {
       allow read, write: if ehAdmin();
+    }
+
+    // --------------------------------------------------- convites
+    // Só a direção gera e enxerga os convites. Quem resgata é uma função com
+    // credencial de servidor, que não passa por estas regras — por isso quem
+    // ainda não tem conta não precisa de leitura nenhuma aqui, e o código não
+    // fica exposto a quem sabe consultar a coleção.
+    match /convites/{codigo} {
+      allow get, list: if ehAdmin();
+      // Só `create`: um código nunca é reescrito. Se o sorteio repetir um
+      // código já existente, a gravação falha em vez de sobrescrever o convite
+      // de outra pessoa — e o cliente sorteia outro.
+      allow create: if ehAdmin();
+      allow update: if false;
+      allow delete: if ehAdmin();
     }
 
     // --------------------------------------------------- participações

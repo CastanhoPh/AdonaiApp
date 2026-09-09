@@ -7,7 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { firebaseConfigurado } from "@/lib/firebase";
 import { useEnvio } from "@/lib/hooks";
 import { MolduraAcesso } from "@/components/acesso/moldura-acesso";
-import { Aviso, Botao, Campo, Entrada } from "@/components/ui";
+import { QrCode } from "@phosphor-icons/react";
+import { Aviso, Botao, BotaoLink, Campo, Divisor, Entrada } from "@/components/ui";
 
 export default function Login() {
   const { usuario, ehAdmin, carregando, entrar, recuperarSenha } = useAuth();
@@ -107,10 +108,12 @@ export default function Login() {
       subtitulo="Entre para ver seu personagem, o roteiro e os próximos ensaios."
       rodape={
         <>
-          Ainda não tem acesso?{" "}
+          Não recebeu convite?{" "}
           <Link href="/cadastro" className="font-medium text-brand-strong underline">
-            Criar minha conta
+            Criar conta sem código
           </Link>
+          <br />
+          A direção liga sua conta à sua ficha depois.
         </>
       }
     >
@@ -154,6 +157,26 @@ export default function Login() {
           Esqueci minha senha
         </button>
       </form>
+
+      {/*
+        Primeiro acesso por convite.
+        Fica na tela de entrar, e não escondido no rodapé, porque é o caminho de
+        quem está abrindo o app pela primeira vez — e é justamente quem não sabe
+        onde procurar. O código já carrega a ficha da pessoa, então ela entra com
+        personagem e histórico no lugar em vez de esperar a direção ligar a conta.
+      */}
+      <div className="mt-6">
+        <Divisor />
+        <p className="mt-6 text-center text-[13px] leading-5 text-ink-caption">
+          Recebeu um QR code ou um código da direção?
+        </p>
+        <div className="mt-3">
+          <BotaoLink href="/convite" variante="ghost" altura="form" larguraTotal className="gap-2">
+            <QrCode size={18} />
+            Tenho um convite
+          </BotaoLink>
+        </div>
+      </div>
     </MolduraAcesso>
   );
 }
