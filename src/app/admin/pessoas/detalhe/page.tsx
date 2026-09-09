@@ -27,6 +27,7 @@ import {
 import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
 import { EnviarFoto } from "@/components/comum/enviar-foto";
+import { AcessoDaPessoa } from "@/components/admin/vincular-acessos";
 import { LinhaParticipacao } from "@/components/comum/participacao-cartao";
 import {
   Abas,
@@ -235,11 +236,13 @@ function ConteudoPerfil() {
       <CorpoAdmin>
         <VoltarPara href="/admin/pessoas" rotulo="Pessoas" />
 
-        <div className="mb-5 flex items-center gap-3.5">
+        <div className="mb-5 flex flex-wrap items-center gap-3.5">
           <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} tamanho={40} />
           <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
             {pessoa.ativo ? "Ativa no grupo" : "Inativa no grupo"}
           </Status>
+          {/* Sem acesso vinculado a pessoa não vê nada do próprio no app. */}
+          <AcessoDaPessoa personId={id} />
           {personagem ? (
             <Tag tom="areia">
               {personagem.nome} · {ROLE_TYPE_LABEL[personagem.tipoPapel]}

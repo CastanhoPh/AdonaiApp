@@ -20,7 +20,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, firebaseConfigurado } from "./firebase";
-import { buscarConta, buscarPessoa, buscarPessoaPorEmail, salvarConta } from "./db";
+import { buscarConta, buscarPessoa, salvarConta } from "./db";
 import { limparCacheDeTelas } from "./hooks";
 import type { Person, UserAccount } from "./types";
 
@@ -41,19 +41,18 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/**
- * Vincula a conta à pessoa cadastrada pela direção com o mesmo e-mail.
- * A tentativa é repetida a cada carregamento enquanto `personId` for nulo,
- * para que o vínculo aconteça mesmo quando a pessoa é cadastrada depois.
+/*
+ * O vínculo entre conta e pessoa é feito pela direção, à mão.
+ *
+ * Antes acontecia sozinho: conta nova era ligada à pessoa cadastrada com o
+ * mesmo e-mail. Automático é conveniente, mas decide sozinho quem é quem a
+ * partir de um campo que qualquer pessoa escolhe ao se cadastrar — e o
+ * histórico de uma pessoa é o tipo de coisa que não deve ser atribuída por
+ * coincidência de texto.
+ *
+ * Conta sem vínculo entra no app e vê a tela de "sem vínculo" até a direção
+ * ligá-la, em Pessoas › Acessos sem vínculo.
  */
-async function vincularPessoa(conta: UserAccount): Promise<UserAccount> {
-  if (conta.personId) return conta;
-  const pessoa = await buscarPessoaPorEmail(conta.email);
-  if (!pessoa) return conta;
-  const atualizada = { ...conta, personId: pessoa.id };
-  await salvarConta(atualizada);
-  return atualizada;
-}
 
 /**
  * Garante que o token carregue `role` e `personId` como claims.
@@ -104,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await salvarConta(registro);
     }
 
-    registro = await vincularPessoa(registro);
     await alinharToken(user, registro);
     setConta(registro);
     setPessoa(registro.personId ? await buscarPessoa(registro.personId) : null);
@@ -155,13 +153,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cadastrar = useCallback(async (nome: string, email: string, senha: string) => {
     const credencial = await createUserWithEmailAndPassword(auth, email.trim(), senha);
     await updateProfile(credencial.user, { displayName: nome.trim() });
-    const pessoaVinculada = await buscarPessoaPorEmail(email);
     await salvarConta({
       uid: credencial.user.uid,
       nome: nome.trim(),
       email: email.trim().toLowerCase(),
       role: "participante",
-      personId: pessoaVinculada?.id ?? null,
+      // Sem vínculo: quem liga a conta à pessoa é a direção.
+      personId: null,
       criadoEm: new Date().toISOString(),
     });
   }, []);

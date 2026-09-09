@@ -10,7 +10,6 @@ import {
   getDoc as getDocDoSdk,
   getDocFromCache,
   getDocs as getDocsDoSdk,
-  getDocsFromCache,
   limit,
   orderBy,
   query,
@@ -21,44 +20,38 @@ import {
   type DocumentData,
   type DocumentReference,
   type DocumentSnapshot,
-  type Query,
   type QueryDocumentSnapshot,
-  type QuerySnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { hojeISO } from "./format";
 
 /*
- * Leitura do disco primeiro, servidor por trás.
+ * Consulta de coleção vai ao servidor. Não use cache-first aqui.
  *
- * O `getDocs` do SDK sempre espera o servidor, então toda tela pagava a ida e
- * volta antes de mostrar qualquer coisa — os "três quadrados" de carregamento
- * apareciam a cada primeira visita de aba. Aqui a consulta é respondida pelo
- * cache em disco (ligado em `firebase.ts`) quando ele tem algo, e a busca no
- * servidor segue em paralelo só para deixar o disco atualizado para a próxima
- * vez.
+ * Uma versão anterior respondia do cache em disco quando ele não estava vazio,
+ * para a tela pintar antes da ida e volta. O defeito: `getDocsFromCache`
+ * devolve o que existe localmente, e "existe algo" não é o mesmo que "existe
+ * tudo". Basta uma leitura anterior de documento único da mesma coleção para o
+ * cache ter uma parte dela — e a consulta devolvia essa parte como se fosse o
+ * conjunto completo.
  *
- * A correção fica com o próprio Firestore, não com um cache meu: toda escrita
- * pelo SDK já atualiza o cache local na hora, então não existe invalidação
- * manual para esquecer. Cache vazio cai direto no servidor, que é o certo —
- * não se pode confundir "coleção vazia" com "nunca baixada".
+ * Foi exatamente o que aconteceu com `listarContas`: o login lê
+ * `users/{uid}` individualmente, então a listagem de contas voltava com uma
+ * conta só e a fila de vínculos parecia vazia. Silencioso, sem erro nenhum, e
+ * valia para qualquer coleção — pessoa, peça, ensaio.
  *
- * Estes dois nomes cobrem as leituras do arquivo inteiro sem tocar em nenhuma
- * chamada: os pontos de uso continuam escrevendo `getDocs`/`getDoc`.
+ * O cache em disco continua valendo a pena: o Firestore reusa o que tem,
+ * manda token de retomada e devolve só o que mudou, além de sustentar a
+ * releitura offline. O que não dá é decidir por conta própria que o cache
+ * está completo.
  */
-async function getDocs<T>(consulta: Query<T>): Promise<QuerySnapshot<T>> {
-  try {
-    const doDisco = await getDocsFromCache(consulta);
-    if (!doDisco.empty) {
-      void getDocsDoSdk(consulta).catch(() => {});
-      return doDisco;
-    }
-  } catch {
-    // Sem IndexedDB (navegação privada, armazenamento bloqueado): vai ao servidor.
-  }
-  return getDocsDoSdk(consulta);
-}
+const getDocs = getDocsDoSdk;
 
+/*
+ * Documento único pode vir do disco: aqui "existe" é resposta completa, não
+ * um pedaço dela — é um documento, não um conjunto. A releitura no servidor
+ * segue por trás para deixar o disco em dia.
+ */
 async function getDoc<T>(referencia: DocumentReference<T>): Promise<DocumentSnapshot<T>> {
   try {
     const doDisco = await getDocFromCache(referencia);
@@ -109,6 +102,33 @@ export async function salvarTokenFcm(uid: string, token: string): Promise<void> 
 export async function salvarConta(conta: UserAccount): Promise<void> {
   const { uid, ...dados } = conta;
   await setDoc(doc(db, "users", uid), dados, { merge: true });
+}
+
+/**
+ * Todas as contas de acesso. Só a direção lê a coleção inteira.
+ *
+ * Serve para a tela de vínculo: é a lista de quem tem acesso, com ou sem
+ * pessoa ligada.
+ */
+export async function listarContas(): Promise<UserAccount[]> {
+  const snap = await getDocs(collection(db, "users"));
+  return snap.docs
+    .map((d) => ({ uid: d.id, ...d.data() }) as UserAccount)
+    .sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
+}
+
+/**
+ * Liga (ou desliga) uma conta de acesso a uma pessoa do cadastro.
+ *
+ * É o passo que faz a pessoa ver o próprio histórico, personagem e ensaios.
+ * Passar `null` desfaz o vínculo — necessário quando alguém é ligado à pessoa
+ * errada, que é justamente o risco que o vínculo automático corria.
+ */
+export async function vincularContaAPessoa(
+  uid: string,
+  personId: string | null,
+): Promise<void> {
+  await updateDoc(doc(db, "users", uid), { personId });
 }
 
 /* ----------------------------------------------------------------- pessoas */

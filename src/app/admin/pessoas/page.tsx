@@ -18,6 +18,7 @@ import { nomeCurto, normalizar, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import type { Character, Participation, Person, Play, Trait } from "@/lib/types";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin } from "@/components/shell";
+import { VincularAcessos } from "@/components/admin/vincular-acessos";
 import {
   Avatar,
   Aviso,
@@ -214,6 +215,13 @@ export default function Pessoas() {
       />
 
       <CorpoAdmin>
+        {/*
+          * Fila de vínculos, fora do bloco de carregamento da lista: é
+          * pendência de trabalho e aparece assim que existir, sem depender de
+          * os filtros e a tabela terminarem de carregar.
+          */}
+        <VincularAcessos />
+
         {dados.carregando ? (
           <Carregando />
         ) : dados.erro ? (
