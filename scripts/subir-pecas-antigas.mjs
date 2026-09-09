@@ -18,21 +18,25 @@
 import { db } from "./firebase-admin-app.mjs";
 
 /*
- * Lista como recebida, na ordem em que foi passada. Grafia preservada de
- * propósito — inclusive "Pascoa" sem acento — porque é o nome que o grupo usa,
- * e corrigir texto de outra pessoa em silêncio não é meu papel.
+ * Lista como recebida, na ordem em que foi passada.
+ *
+ * "Páscoa" saiu sem acento na lista original e foi cadastrada assim; a correção
+ * veio depois, confirmada, e está refletida aqui. As datas de abril de 2026
+ * ficam como recebidas: "Paçoca no Avalanche" em 25/04 e "Quem Deus Diz que
+ * Somos II" em 11/04, mesmo aparecendo na ordem inversa na lista — foi
+ * confirmado que estão certas.
  */
 const PECAS = [
-  { titulo: "Ele É", evento: "Pascoa 2024", data: "31/03/2024" },
+  { titulo: "Ele É", evento: "Páscoa 2024", data: "31/03/2024" },
   { titulo: "José no Egito", evento: "Convenção 2024", data: "13/07/2024" },
   { titulo: "Jardim Secreto", evento: "Rede Mil 2024", data: "19/10/2024" },
   { titulo: "Filho Pródigo", evento: "Culto de Colheita", data: "16/02/2025" },
-  { titulo: "A Recompensa", evento: "Pascoa 2025", data: "20/04/2025" },
+  { titulo: "A Recompensa", evento: "Páscoa 2025", data: "20/04/2025" },
   { titulo: "Nascimento de Jesus", evento: "Convenção 2025", data: "18/07/2025" },
   { titulo: "Além do Céu Azul", evento: "Rede Mil 2025", data: "12/10/2025" },
   { titulo: "Quem Deus Diz que Somos I", evento: "Encontro 2025", data: "26/10/2025" },
   { titulo: "A Resposta", evento: "Natal 2025", data: "22/12/2025" },
-  { titulo: "Está Consumado", evento: "Pascoa 2026", data: "05/04/2026" },
+  { titulo: "Está Consumado", evento: "Páscoa 2026", data: "05/04/2026" },
   { titulo: "Paçoca no Avalanche", evento: "10 Anos de Avalanche", data: "25/04/2026" },
   { titulo: "Quem Deus Diz que Somos II", evento: "Encontro 2026 I", data: "11/04/2026" },
   { titulo: "Quem Deus Diz que Somos III", evento: "Encontro 2026 II", data: "03/07/2026" },
