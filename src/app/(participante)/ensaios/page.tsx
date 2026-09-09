@@ -7,11 +7,11 @@ import { dataLonga, hojeISO } from "@/lib/format";
 import { useCarregar } from "@/lib/hooks";
 import { useAtual } from "@/lib/uso-atual";
 import type { Rehearsal } from "@/lib/types";
-import { ErroCarregamento } from "@/components/shell";
+import { ErroCarregamento, TopoAba } from "@/components/shell";
 import { CartaoEnsaio } from "@/components/comum/ensaio-cartao";
 import { ConfirmarPresenca } from "@/components/comum/presenca";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
-import { Abas, CabecalhoPagina, Carregando, Vazio } from "@/components/ui";
+import { Abas, Carregando, Vazio } from "@/components/ui";
 
 type Aba = "proximos" | "anteriores";
 
@@ -46,7 +46,7 @@ export default function Ensaios() {
   if (!pessoa) {
     return (
       <>
-        <CabecalhoPagina titulo="Ensaios" />
+        <TopoAba titulo="Ensaios" />
         <SemVinculo />
       </>
     );
@@ -59,7 +59,7 @@ export default function Ensaios() {
   if (!peca) {
     return (
       <>
-        <CabecalhoPagina titulo="Ensaios" />
+        <TopoAba titulo="Ensaios" />
         <Vazio
           titulo="Nenhuma peça em andamento"
           descricao="Os ensaios aparecem aqui quando a direção definir a peça atual."
@@ -72,7 +72,7 @@ export default function Ensaios() {
 
   return (
     <div>
-      <CabecalhoPagina titulo="Ensaios" descricao={peca.titulo} />
+      <TopoAba titulo="Ensaios" subtitulo={peca.titulo} />
 
       <Abas
         className="mb-4"

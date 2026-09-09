@@ -303,21 +303,84 @@ export function ShellParticipante({ children }: { children: ReactNode }) {
  * Cabeçalho do Início: avatar 40 + saudação + símbolo do Aliança à direita,
  * com hairline abaixo.
  */
+/**
+ * Moldura do topo, compartilhada por todas as telas do participante.
+ *
+ * As quatro abas são do mesmo nível, então o topo tem de ser o mesmo. Antes
+ * cada uma trazia o seu: Início com saudação e fio, Roteiro com seta de voltar
+ * e título de 15px, Ensaios e Perfil só com título de 20px e sem fio nenhum.
+ * Fora a inconsistência, as alturas diferentes faziam o conteúdo pular a cada
+ * troca de aba.
+ *
+ * A altura mínima é a do topo mais alto: duas linhas de texto (18 + 24), os 16
+ * de respiro e o próprio fio de 1px — 59 no total, porque a caixa inclui a
+ * borda. É ela que mantém o fio na mesma linha nas telas de uma linha só, que
+ * sem isso ficariam 3px mais curtas.
+ *
+ * As subtelas (Meu personagem, Histórico) saem 2px mais altas: o botão de
+ * voltar tem 44px de alvo de toque, que é o mínimo para não errar o dedo, e
+ * encurtá-lo para casar a altura sairia mais caro do que os 2px.
+ */
+function MolduraTopo({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <header
+      className={juntar(
+        "-mx-5 mb-4 flex min-h-[59px] items-center gap-3 border-b border-stroke-frame px-5 pb-4 sem-impressao",
+        className,
+      )}
+    >
+      {children}
+    </header>
+  );
+}
+
 export function TopoInicio({ saudacao, nome }: { saudacao: string; nome: string }) {
   const { pessoa, conta } = useAuth();
   return (
-    <header className="-mx-5 mb-4 border-b border-stroke-frame px-5 pb-4">
-      <div className="flex items-center gap-3">
-        <Avatar nome={nome} url={pessoa?.fotoUrl} tamanho={40} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] leading-[18px] text-ink-caption">{saudacao},</p>
-          <p className="truncate text-[16px] leading-6 font-bold text-ink-heading">
-            {nomeCurto(pessoa?.nome ?? conta?.nome ?? nome)}
-          </p>
-        </div>
-        <MarcaAlianca tamanho={26} opacidade={0.5} />
+    <MolduraTopo>
+      <Avatar nome={nome} url={pessoa?.fotoUrl} tamanho={40} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] leading-[18px] text-ink-caption">{saudacao},</p>
+        <p className="truncate text-[16px] leading-6 font-bold text-ink-heading">
+          {nomeCurto(pessoa?.nome ?? conta?.nome ?? nome)}
+        </p>
       </div>
-    </header>
+      <MarcaAlianca tamanho={26} opacidade={0.5} />
+    </MolduraTopo>
+  );
+}
+
+/**
+ * Topo das outras três abas (Roteiro, Ensaios, Perfil).
+ *
+ * Sem seta de voltar de propósito: são destinos da tab bar, não subtelas, e
+ * "voltar" num item de menu não tem para onde ir. A marca do Aliança ocupa a
+ * direita quando a tela não tem ações próprias, para as quatro abas lerem como
+ * a mesma barra.
+ */
+export function TopoAba({
+  titulo,
+  subtitulo,
+  acoes,
+}: {
+  titulo: string;
+  subtitulo?: string;
+  acoes?: ReactNode;
+}) {
+  return (
+    <MolduraTopo>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-[20px] leading-6 font-bold text-ink-heading">{titulo}</h1>
+        {subtitulo ? (
+          <p className="truncate text-[12px] leading-[18px] text-ink-caption">{subtitulo}</p>
+        ) : null}
+      </div>
+      {acoes ? (
+        <div className="flex shrink-0 items-center gap-1">{acoes}</div>
+      ) : (
+        <MarcaAlianca tamanho={26} opacidade={0.5} />
+      )}
+    </MolduraTopo>
   );
 }
 
@@ -335,7 +398,7 @@ export function TopoParticipante({
 }) {
   const router = useRouter();
   return (
-    <header className="-mx-5 mb-4 flex items-center gap-1 border-b border-stroke-frame px-3 pb-3">
+    <MolduraTopo className="gap-1 px-2">
       {voltarPara ? (
         <Link
           href={voltarPara}
@@ -350,13 +413,13 @@ export function TopoParticipante({
         </BotaoIcone>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] leading-6 font-bold text-ink-heading">{titulo}</p>
+        <h1 className="truncate text-[20px] leading-6 font-bold text-ink-heading">{titulo}</h1>
         {subtitulo ? (
-          <p className="truncate text-[11px] leading-4 text-ink-caption">{subtitulo}</p>
+          <p className="truncate text-[12px] leading-[18px] text-ink-caption">{subtitulo}</p>
         ) : null}
       </div>
-      {acoes ? <div className="flex shrink-0 items-center">{acoes}</div> : null}
-    </header>
+      {acoes ? <div className="flex shrink-0 items-center gap-1">{acoes}</div> : null}
+    </MolduraTopo>
   );
 }
 

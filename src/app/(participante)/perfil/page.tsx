@@ -10,6 +10,7 @@ import { useCarregar, useEnvio } from "@/lib/hooks";
 import { reabrirGuia } from "@/lib/instalacao";
 import { useAtual } from "@/lib/uso-atual";
 import { MAIORIDADE, ROLE_TYPE_LABEL, type Participation, type Trait } from "@/lib/types";
+import { TopoAba } from "@/components/shell";
 import { FormularioCadastro } from "@/components/acesso/cadastro-pessoa";
 import { ControleNotificacoes } from "@/components/comum/notificacoes";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
@@ -17,7 +18,6 @@ import {
   Avatar,
   Aviso,
   Botao,
-  CabecalhoPagina,
   Campo,
   Cartao,
   Divisor,
@@ -88,7 +88,7 @@ export default function Perfil() {
   if (!pessoa) {
     return (
       <div>
-        <CabecalhoPagina titulo="Perfil" />
+        <TopoAba titulo="Perfil" />
         <SemVinculo />
         <Cartao className="mt-4 px-4 py-3.5">
           <p className="text-[13px] leading-5 text-ink-caption">Conta</p>
@@ -108,7 +108,7 @@ export default function Perfil() {
 
   return (
     <div>
-      <CabecalhoPagina titulo="Perfil" />
+      <TopoAba titulo="Perfil" />
 
       <Cartao className="mb-4 px-4 py-4">
         <div className="flex items-start gap-3.5">

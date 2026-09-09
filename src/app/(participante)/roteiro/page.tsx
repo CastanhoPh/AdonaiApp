@@ -8,7 +8,7 @@ import { dataCurta, normalizar, rotuloCena } from "@/lib/format";
 import { useCarregar } from "@/lib/hooks";
 import { useAtual } from "@/lib/uso-atual";
 import type { ScriptLine } from "@/lib/types";
-import { ErroCarregamento, TopoParticipante } from "@/components/shell";
+import { ErroCarregamento, TopoAba } from "@/components/shell";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
 import {
   Abas,
@@ -120,7 +120,7 @@ export default function Roteiro() {
   if (!pessoa) {
     return (
       <>
-        <TopoParticipante titulo="Roteiro" voltarPara="/inicio" />
+        <TopoAba titulo="Roteiro" />
         <SemVinculo />
       </>
     );
@@ -133,7 +133,7 @@ export default function Roteiro() {
   if (!peca) {
     return (
       <>
-        <TopoParticipante titulo="Roteiro" voltarPara="/inicio" />
+        <TopoAba titulo="Roteiro" />
         <Vazio
           titulo="Nenhuma peça em andamento"
           descricao="O roteiro aparece aqui quando a direção definir a peça atual."
@@ -145,7 +145,7 @@ export default function Roteiro() {
   if (!peca.roteiroPublicado) {
     return (
       <>
-        <TopoParticipante titulo="Roteiro" subtitulo={peca.titulo} voltarPara="/inicio" />
+        <TopoAba titulo="Roteiro" subtitulo={peca.titulo} />
         <Vazio
           titulo="Roteiro ainda não publicado"
           descricao="A direção está preparando o roteiro. Assim que a primeira versão for publicada, ele aparece aqui."
@@ -164,10 +164,9 @@ export default function Roteiro() {
 
   return (
     <div className="pb-24">
-      <TopoParticipante
+      <TopoAba
         titulo="Roteiro"
         subtitulo={subtitulo}
-        voltarPara="/inicio"
         acoes={
           <>
             <BotaoIcone
