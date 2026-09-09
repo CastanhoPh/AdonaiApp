@@ -7,6 +7,7 @@ import {
   buscarObservacoes,
   buscarPecaAtual,
   buscarPersonagemDaPessoa,
+  buscarCaracteristicasAtribuidas,
   buscarPessoa,
   listarCaracteristicas,
   listarParticipacoes,
@@ -79,16 +80,18 @@ function ConteudoPerfil() {
         observacoes: "",
       };
     }
-    const [pessoa, peca, participacoes, caracteristicas, notas] = await Promise.all([
+    const [pessoa, peca, participacoes, caracteristicas, notas, atribuidas] = await Promise.all([
       buscarPessoa(id),
       buscarPecaAtual(),
       listarParticipacoes(id),
       listarCaracteristicas(),
       buscarObservacoes(id),
+      buscarCaracteristicasAtribuidas(),
     ]);
     const personagem = peca ? await buscarPersonagemDaPessoa(peca.id, id) : null;
     return {
-      pessoa,
+      // Mesclado aqui: o documento da pessoa não guarda mais a avaliação.
+      pessoa: pessoa ? { ...pessoa, caracteristicas: atribuidas.pessoas[id] ?? [] } : null,
       peca,
       personagem,
       participacoes,

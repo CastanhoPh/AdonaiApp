@@ -9,6 +9,8 @@ import {
   listarCaracteristicas,
   listarPecas,
   listarPersonagens,
+  buscarCaracteristicasAtribuidas,
+  comCaracteristicas,
   listarPessoas,
   listarTodasParticipacoes,
 } from "@/lib/db";
@@ -71,15 +73,23 @@ export default function Pessoas() {
      * não se distingue "sem peça" de "ainda não baixei". Era uma ida ao
      * servidor garantida a cada primeira visita desta tela.
      */
-    const [pessoas, caracteristicas, pecas, participacoes] = await Promise.all([
+    const [pessoas, caracteristicas, pecas, participacoes, atribuidas] = await Promise.all([
       listarPessoas(),
       listarCaracteristicas(),
       listarPecas(),
       listarTodasParticipacoes(),
+      buscarCaracteristicasAtribuidas(),
     ]);
     const peca = pecas.find((p) => p.atual) ?? null;
     const personagens = peca ? await listarPersonagens(peca.id) : [];
-    return { pessoas, caracteristicas, peca, personagens, participacoes };
+    return {
+      // Mesclado aqui: o documento da pessoa não guarda mais a avaliação.
+      pessoas: comCaracteristicas(pessoas, atribuidas.pessoas, "caracteristicas"),
+      caracteristicas,
+      peca,
+      personagens,
+      participacoes,
+    };
   }, []);
 
   const [busca, setBusca] = useState("");

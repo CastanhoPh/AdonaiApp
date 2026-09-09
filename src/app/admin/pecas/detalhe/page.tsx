@@ -4,7 +4,9 @@ import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CalendarDots, Scroll } from "@phosphor-icons/react";
 import {
+  buscarCaracteristicasAtribuidas,
   buscarPeca,
+  comCaracteristicas,
   listarCaracteristicas,
   listarEnsaios,
   listarFalas,
@@ -68,15 +70,29 @@ function ConteudoPeca() {
         ensaios: 0,
       };
     }
-    const [peca, personagens, pessoas, caracteristicas, falas, ensaios] = await Promise.all([
-      buscarPeca(id),
-      listarPersonagens(id),
-      listarPessoas(),
-      listarCaracteristicas(),
-      listarFalas(id),
-      listarEnsaios(id),
-    ]);
-    return { peca, personagens, pessoas, caracteristicas, falas, ensaios: ensaios.length };
+    const [peca, personagens, pessoas, caracteristicas, falas, ensaios, atribuidas] =
+      await Promise.all([
+        buscarPeca(id),
+        listarPersonagens(id),
+        listarPessoas(),
+        listarCaracteristicas(),
+        listarFalas(id),
+        listarEnsaios(id),
+        buscarCaracteristicasAtribuidas(),
+      ]);
+    return {
+      peca,
+      /*
+       * A aba Elenco compara o que o papel pede com o que a pessoa tem, e as
+       * duas pontas vêm mescladas aqui — nenhum dos dois documentos guarda
+       * mais a avaliação.
+       */
+      personagens: comCaracteristicas(personagens, atribuidas.papeis, "caracteristicasDesejadas"),
+      pessoas: comCaracteristicas(pessoas, atribuidas.pessoas, "caracteristicas"),
+      caracteristicas,
+      falas,
+      ensaios: ensaios.length,
+    };
   }, [id]);
 
   // Atalhos do painel apontam direto para uma aba (&aba=elenco); a escolha

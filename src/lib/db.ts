@@ -132,20 +132,27 @@ export async function buscarPessoaPorEmail(email: string): Promise<Person | null
 }
 
 export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promise<string> {
+  // As características saem do documento da pessoa: veja REF_ATRIBUICOES.
+  const { caracteristicas, ...doDocumento } = dados;
   const ref = doc(collection(db, "people"));
   await setDoc(ref, {
-    ...dados,
+    ...doDocumento,
     email: dados.email.toLowerCase(),
     criadoEm: new Date().toISOString(),
   });
+  if (caracteristicas?.length) await definirCaracteristicasDaPessoa(ref.id, caracteristicas);
   return ref.id;
 }
 
 export async function atualizarPessoa(id: string, dados: Partial<Person>): Promise<void> {
   const limpo = { ...dados };
   delete limpo.id;
+  // Desviada para o documento da direção, nunca para o da pessoa.
+  const caracteristicas = limpo.caracteristicas;
+  delete limpo.caracteristicas;
   if (typeof limpo.email === "string") limpo.email = limpo.email.toLowerCase();
-  await updateDoc(doc(db, "people", id), limpo);
+  if (Object.keys(limpo).length > 0) await updateDoc(doc(db, "people", id), limpo);
+  if (caracteristicas) await definirCaracteristicasDaPessoa(id, caracteristicas);
 }
 
 /** Campos que a própria pessoa preenche no cadastro de primeiro acesso. */
@@ -190,6 +197,77 @@ export async function salvarObservacoes(personId: string, observacoes: string): 
 }
 
 /* --------------------------------------------------------- características */
+
+/*
+ * As características de atuação são avaliação que a direção faz das pessoas, e
+ * ficam fora dos documentos que o elenco lê.
+ *
+ * Antes moravam em `people/{id}.caracteristicas` e
+ * `characters/{id}.caracteristicasDesejadas`. Esconder as duas seções da
+ * interface do participante não bastava: as regras liberam `people` e
+ * `characters` para qualquer autenticado, então quem abrisse as ferramentas do
+ * navegador alcançava a avaliação de todo mundo. Não dá para simplesmente
+ * fechar essas coleções — o participante precisa delas para ver nomes em
+ * convocação, presença e elenco.
+ *
+ * Por isso a atribuição vive num único documento só de administradores. Um
+ * documento em vez de uma subcoleção por pessoa porque a tabela de Pessoas
+ * mostra as marcações de todo o grupo de uma vez: assim é uma leitura, não uma
+ * por integrante.
+ */
+const REF_ATRIBUICOES = () => doc(db, "direcao", "caracteristicas");
+
+export interface CaracteristicasAtribuidas {
+  /** personId → ids de traits. */
+  pessoas: Record<string, string[]>;
+  /** characterId → ids de traits desejadas no papel. */
+  papeis: Record<string, string[]>;
+}
+
+const SEM_ATRIBUICOES: CaracteristicasAtribuidas = { pessoas: {}, papeis: {} };
+
+/** Só a direção consegue ler; para participante a regra nega e devolve vazio. */
+export async function buscarCaracteristicasAtribuidas(): Promise<CaracteristicasAtribuidas> {
+  try {
+    const snap = await getDoc(REF_ATRIBUICOES());
+    if (!snap.exists()) return SEM_ATRIBUICOES;
+    const dados = snap.data() as Partial<CaracteristicasAtribuidas>;
+    return { pessoas: dados.pessoas ?? {}, papeis: dados.papeis ?? {} };
+  } catch {
+    return SEM_ATRIBUICOES;
+  }
+}
+
+/**
+ * Grava a atribuição de uma pessoa ou de um papel.
+ *
+ * `setDoc` com merge e caminho pontilhado toca só a chave daquele id, então
+ * duas telas da direção editando ao mesmo tempo não se sobrescrevem.
+ */
+async function definirAtribuicao(
+  grupo: "pessoas" | "papeis",
+  id: string,
+  ids: string[],
+): Promise<void> {
+  await setDoc(REF_ATRIBUICOES(), { [grupo]: { [id]: ids } }, { merge: true });
+}
+
+export function definirCaracteristicasDaPessoa(personId: string, ids: string[]): Promise<void> {
+  return definirAtribuicao("pessoas", personId, ids);
+}
+
+export function definirCaracteristicasDoPapel(characterId: string, ids: string[]): Promise<void> {
+  return definirAtribuicao("papeis", characterId, ids);
+}
+
+/** Mescla a atribuição nos objetos que as telas da direção já esperam. */
+export function comCaracteristicas<T extends { id: string }>(
+  itens: T[],
+  mapa: Record<string, string[]>,
+  campo: "caracteristicas" | "caracteristicasDesejadas",
+): T[] {
+  return itens.map((item) => ({ ...item, [campo]: mapa[item.id] ?? [] }));
+}
 
 export async function listarCaracteristicas(): Promise<Trait[]> {
   const snap = await getDocs(query(collection(db, "traits"), orderBy("ordem")));
@@ -344,8 +422,12 @@ export async function criarPersonagem(
   playId: string,
   dados: Omit<Character, "id" | "playId">,
 ): Promise<string> {
+  const { caracteristicasDesejadas, ...doDocumento } = dados;
   const ref = doc(collection(db, "plays", playId, "characters"));
-  await setDoc(ref, { ...dados, playId });
+  await setDoc(ref, { ...doDocumento, playId });
+  if (caracteristicasDesejadas?.length) {
+    await definirCaracteristicasDoPapel(ref.id, caracteristicasDesejadas);
+  }
   return ref.id;
 }
 
@@ -357,7 +439,12 @@ export async function atualizarPersonagem(
   const limpo = { ...dados };
   delete limpo.id;
   delete limpo.playId;
-  await updateDoc(doc(db, "plays", playId, "characters", id), limpo);
+  const desejadas = limpo.caracteristicasDesejadas;
+  delete limpo.caracteristicasDesejadas;
+  if (Object.keys(limpo).length > 0) {
+    await updateDoc(doc(db, "plays", playId, "characters", id), limpo);
+  }
+  if (desejadas) await definirCaracteristicasDoPapel(id, desejadas);
 }
 
 export async function removerPersonagem(playId: string, id: string): Promise<void> {

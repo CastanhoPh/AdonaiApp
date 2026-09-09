@@ -77,8 +77,15 @@ export interface Person {
   telefone: string;
   fotoUrl: string;
   ativo: boolean;
-  /** Ids de `traits/{traitId}` marcadas para a pessoa. */
-  caracteristicas: string[];
+  /**
+   * Ids de `traits/{traitId}` marcadas para a pessoa.
+   *
+   * Não fica no documento: é avaliação da direção e mora em
+   * `direcao/caracteristicas`, que só administrador lê. Chega aqui mesclado
+   * por `comCaracteristicas`, e por isso é opcional — no cliente do
+   * participante vem sempre vazio.
+   */
+  caracteristicas?: string[];
   criadoEm: string;
 
   /*
@@ -190,8 +197,8 @@ export interface Character {
   nome: string;
   descricao: string;
   tipoPapel: RoleType;
-  /** Ids de `traits/{traitId}` desejadas para o papel. */
-  caracteristicasDesejadas: string[];
+  /** Desejadas para o papel. Fora do documento, como em `Person`. */
+  caracteristicasDesejadas?: string[];
   /** Pessoa escalada. Um personagem tem no máximo uma pessoa por vez (regra 7). */
   personId: string | null;
   personNome: string;

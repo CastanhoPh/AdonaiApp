@@ -6,8 +6,9 @@ rules_version = '2';
 //  - Somente administradores alteram elenco, roteiro, peças e ensaios.
 //  - Participantes leem os dados da produção e editam apenas telefone e foto
 //    do próprio cadastro.
-//  - As observações internas da direção ficam em `people/{id}/privado/*`,
-//    fora do alcance dos participantes.
+//  - As observações internas da direção ficam em `people/{id}/privado/*`, e as
+//    características de atuação em `direcao/caracteristicas` — ambas fora do
+//    alcance dos participantes, que leem `people` e `characters`.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -92,9 +93,25 @@ service cloud.firestore {
 
     // ------------------------------------------------- características
 
+    /*
+     * Vocabulário de avaliação da direção. Fechado para o participante: as
+     * telas dele não mostram mais característica nenhuma, então não há motivo
+     * para o cliente conseguir baixar os rótulos.
+     */
     match /traits/{traitId} {
-      allow get, list: if autenticado();
-      allow write: if ehAdmin();
+      allow read, write: if ehAdmin();
+    }
+
+    /*
+     * Quem tem qual característica, e o que cada papel pede.
+     *
+     * Fica aqui, e não em `people` ou `characters`, porque essas duas são
+     * legíveis por qualquer autenticado — o participante precisa delas para
+     * ver nomes em convocação, presença e elenco. Guardar a avaliação junto
+     * significava entregá-la a quem abrisse as ferramentas do navegador.
+     */
+    match /direcao/{documento} {
+      allow read, write: if ehAdmin();
     }
 
     // ------------------------------------------------------------ peças
