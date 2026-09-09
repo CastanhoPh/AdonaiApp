@@ -15,7 +15,12 @@
  */
 import { useState } from "react";
 import { LinkSimple, Warning } from "@phosphor-icons/react";
-import { listarContas, listarPessoas, vincularContaAPessoa } from "@/lib/db";
+import {
+  atualizarPessoa,
+  listarContas,
+  listarPessoas,
+  vincularContaAPessoa,
+} from "@/lib/db";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import type { Person, UserAccount } from "@/lib/types";
 import { Aviso, Botao, Cartao, Esqueleto, Selecao, Tag, TituloSecao } from "@/components/ui";
@@ -46,6 +51,12 @@ export function VincularAcessos() {
     if (!personId) return;
     await enviar(async () => {
       await vincularContaAPessoa(conta.uid, personId);
+      /*
+       * Vincular também ativa. É o inverso da regra que deixa inativa quem não
+       * tem acesso: sem isto a pessoa ganharia acesso e continuaria fora da
+       * convocação de ensaio, o que anula o propósito do vínculo.
+       */
+      await atualizarPessoa(personId, { ativo: true });
       await dados.recarregar();
     });
     setEscolhas((atual) => {
@@ -78,7 +89,7 @@ export function VincularAcessos() {
         titulo={`${semVinculo.length} ${
           semVinculo.length === 1 ? "acesso sem vínculo" : "acessos sem vínculo"
         }`}
-        descricao="Estas contas entraram no app mas ainda não estão ligadas a ninguém do cadastro. Sem o vínculo, a pessoa não vê personagem, roteiro, ensaio nem histórico."
+        descricao="Estas contas entraram no app mas ainda não estão ligadas a ninguém do cadastro. Sem o vínculo, a pessoa não vê personagem, roteiro, ensaio nem histórico. Vincular também marca a pessoa como ativa no grupo."
       />
 
       <ul className="space-y-3">

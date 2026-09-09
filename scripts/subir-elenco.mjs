@@ -165,7 +165,8 @@ if (aplicar && aCriar.length > 0) {
       email: "",
       telefone: "",
       fotoUrl: "",
-      ativo: true,
+      // Inativa até ter acesso vinculado; ver inativar-sem-acesso.mjs.
+      ativo: false,
       criadoEm: agora,
     });
     idPorNome.set(normalizar(nome), ref.id);

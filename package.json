@@ -20,7 +20,8 @@
     "corrigir-pecas": "node scripts/corrigir-pecas.mjs",
     "elenco": "node scripts/subir-elenco.mjs",
     "corrigir-acervo": "node scripts/corrigir-acervo.mjs",
-    "acervo": "node scripts/subir-acervo.mjs"
+    "acervo": "node scripts/subir-acervo.mjs",
+    "inativar": "node scripts/inativar-sem-acesso.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -387,7 +387,12 @@ if (aplicar && faltando.length > 0) {
   const lote = db.batch();
   for (const nome of faltando) {
     const ref = db.collection("people").doc();
-    lote.set(ref, { nome, email: "", telefone: "", fotoUrl: "", ativo: true, criadoEm: agora });
+    /*
+     * Nasce inativa: "ativa no grupo" significa "participa e usa o app",
+     * e pessoa do acervo entra sem acesso. A ativação acontece ao
+     * vincular a conta, em Pessoas.
+     */
+    lote.set(ref, { nome, email: "", telefone: "", fotoUrl: "", ativo: false, criadoEm: agora });
     idPorNome.set(normalizar(nome), ref.id);
   }
   await lote.commit();

@@ -96,7 +96,14 @@ export default function Pessoas() {
   const [filtroTrait, setFiltroTrait] = useState("todas");
   const [filtroPersonagem, setFiltroPersonagem] = useState("todos");
   const [filtroPecas, setFiltroPecas] = useState<string>("todas");
-  const [filtroSituacao, setFiltroSituacao] = useState("ativos");
+  /*
+   * Abre mostrando ativos e inativos.
+   *
+   * "Ativa no grupo" passa a significar "participa e usa o app", e quem está no
+   * cadastro só pelo acervo fica inativa. Com o filtro em "somente ativos", a
+   * tela mostrava 4 de 42 pessoas e parecia que o acervo não tinha entrado.
+   */
+  const [filtroSituacao, setFiltroSituacao] = useState("todos");
 
   const [formAberto, setFormAberto] = useState(false);
   const [traitAberto, setTraitAberto] = useState(false);
@@ -293,9 +300,9 @@ export default function Pessoas() {
                   onChange={(e) => setFiltroSituacao(e.target.value)}
                   aria-label="Filtrar por situação"
                 >
+                  <option value="todos">Ativos e inativos</option>
                   <option value="ativos">Somente ativos</option>
                   <option value="inativos">Somente inativos</option>
-                  <option value="todos">Ativos e inativos</option>
                 </Selecao>
               </div>
             </div>
