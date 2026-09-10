@@ -22,7 +22,7 @@ primeiro para o celular.
 | Arquivos      | Firebase Storage (regras prontas)                |
 
 Todo o acesso ao banco acontece no navegador, pelo SDK do Firebase, com as
-permissões garantidas pelas regras em [`firestore.rules`](firestore.rules).
+permissões garantidas pelas regras em [`firebase/firestore.rules`](firebase/firestore.rules).
 
 ## Sistema visual
 
@@ -55,7 +55,7 @@ em [`.firebaserc`](.firebaserc):
 
 - Authentication com e-mail e senha — ativo
 - Cloud Firestore `(default)` em modo nativo — ativo, com as regras de
-  [`firestore.rules`](firestore.rules) publicadas
+  [`firebase/firestore.rules`](firebase/firestore.rules) publicadas
 - Hosting — site `adonaiapp` servindo a exportação estática
 - Características iniciais cadastradas, duas contas de administração e uma de
   participante criadas
