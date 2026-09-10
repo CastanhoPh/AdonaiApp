@@ -17,7 +17,7 @@ import {
   Entrada,
   Modal,
   Selecao,
-  TituloSecao,
+  Tag,
 } from "@/components/ui";
 import { EnviarFoto } from "@/components/comum/enviar-foto";
 
@@ -59,20 +59,29 @@ export function AbaDados({
       definirErro("Informe o título da peça.");
       return;
     }
+    const gravado = {
+      titulo: form.titulo.trim(),
+      nomeEvento: form.nomeEvento.trim(),
+      descricao: form.descricao.trim(),
+      capaUrl: form.capaUrl.trim(),
+      elencoFechado: form.elencoFechado,
+      dataApresentacao: form.dataApresentacao,
+      local: form.local.trim(),
+      status: form.status as PlayStatus,
+    };
     const ok = await enviar(async () => {
-      await atualizarPeca(peca.id, {
-        titulo: form.titulo.trim(),
-        nomeEvento: form.nomeEvento.trim(),
-        descricao: form.descricao.trim(),
-        capaUrl: form.capaUrl.trim(),
-        elencoFechado: form.elencoFechado,
-        dataApresentacao: form.dataApresentacao,
-        local: form.local.trim(),
-        status: form.status as PlayStatus,
-      });
+      await atualizarPeca(peca.id, gravado);
       await onAtualizar();
     });
-    if (ok) setSalvo(true);
+    if (!ok) return;
+    /*
+     * O formulário passa a mostrar exatamente o que foi gravado — os textos
+     * vão aparados, e antes o campo continuava com o espaço em volta até a
+     * página remontar. Sincronizar aqui é o que permitiu tirar `titulo` e
+     * `status` da chave de remontagem, que apagava o aviso de sucesso.
+     */
+    setForm({ ...form, ...gravado });
+    setSalvo(true);
   }
 
   async function tornarAtual() {
@@ -87,48 +96,47 @@ export function AbaDados({
       await concluirPeca(peca.id);
       await onAtualizar();
     });
-    if (ok) setConfirmando(false);
+    if (!ok) return;
+    // Concluir muda o status fora do formulário; o campo tem de acompanhar.
+    setForm((atual) => ({ ...atual, status: "concluida" }));
+    setConfirmando(false);
   }
 
   return (
-    <div className="grid gap-4 min-[900px]:grid-cols-[1.1fr_1fr]">
-      <Cartao className="px-4 py-4">
-        <TituloSecao titulo="Dados da peça" />
+    /*
+      `items-start` é o que conserta o pior desta tela: sem ele a grade
+      esticava o cartão da direita até a altura do formulário, e "Situação da
+      produção" — que tem três linhas de conteúdo — virava um retângulo com
+      dois palmos de vazio dentro.
+    */
+    <div className="grid items-start gap-4 min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+      <Cartao className="overflow-hidden">
+        <div className="border-b border-stroke-list px-4 py-3">
+          <h3 className="text-[14px] leading-5 font-bold text-ink-heading">Dados da peça</h3>
+        </div>
 
-        <div className="space-y-3.5">
-          <Campo etiqueta="Título" obrigatorio>
-            <Entrada
-              value={form.titulo}
-              onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-            />
-          </Campo>
-          <Campo etiqueta="Nome do evento" dica="Opcional. É o que dá contexto no histórico.">
-            <Entrada
-              value={form.nomeEvento}
-              onChange={(e) => setForm({ ...form, nomeEvento: e.target.value })}
-              placeholder="Ex.: Congresso de Jovens 2026"
-            />
-          </Campo>
-          <Campo etiqueta="Descrição">
-            <AreaTexto
-              value={form.descricao}
-              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-            />
-          </Campo>
-          <Campo etiqueta="Capa da peça">
-            {/* Grava na hora: o arquivo já subiu, ver aba-personagens. */}
-            <EnviarFoto
-              caminho={caminhoDaCapaDaPeca(peca.id)}
-              atual={form.capaUrl}
-              ladoMaximo={LADO_CENA}
-              formato="retangulo"
-              rotulo="Escolher capa"
-              onEnviada={(url) => salvarCapa(url)}
-              onRemovida={() => salvarCapa("")}
-              desabilitado={enviando}
-            />
-          </Campo>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3.5 px-4 py-4">
+          {/*
+            Os campos curtos entram em pares. Um por linha deixava o formulário
+            com o dobro da altura sem usar a largura que a coluna já tem.
+          */}
+          <div className="grid gap-3.5 min-[560px]:grid-cols-2">
+            <Campo etiqueta="Título" obrigatorio>
+              <Entrada
+                value={form.titulo}
+                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
+              />
+            </Campo>
+            <Campo etiqueta="Nome do evento" dica="Opcional. É o que dá contexto no histórico.">
+              <Entrada
+                value={form.nomeEvento}
+                onChange={(e) => setForm({ ...form, nomeEvento: e.target.value })}
+                placeholder="Ex.: Congresso de Jovens 2026"
+              />
+            </Campo>
+          </div>
+
+          <div className="grid gap-3.5 min-[560px]:grid-cols-2">
             <Campo etiqueta="Data da apresentação">
               <Entrada
                 type="date"
@@ -144,6 +152,7 @@ export function AbaDados({
               />
             </Campo>
           </div>
+
           <Campo etiqueta="Status">
             <Selecao
               value={form.status}
@@ -155,6 +164,27 @@ export function AbaDados({
                 </option>
               ))}
             </Selecao>
+          </Campo>
+
+          <Campo etiqueta="Descrição">
+            <AreaTexto
+              value={form.descricao}
+              onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+            />
+          </Campo>
+
+          <Campo etiqueta="Capa da peça">
+            {/* Grava na hora: o arquivo já subiu, ver aba-personagens. */}
+            <EnviarFoto
+              caminho={caminhoDaCapaDaPeca(peca.id)}
+              atual={form.capaUrl}
+              ladoMaximo={LADO_CENA}
+              formato="retangulo"
+              rotulo="Escolher capa"
+              onEnviada={(url) => salvarCapa(url)}
+              onRemovida={() => salvarCapa("")}
+              desabilitado={enviando}
+            />
           </Campo>
 
           {/*
@@ -180,42 +210,65 @@ export function AbaDados({
         </div>
       </Cartao>
 
-      <Cartao className="px-4 py-4">
-        <TituloSecao
-          titulo="Situação da produção"
-          descricao="Somente uma peça é considerada a peça atual pelos participantes."
-        />
-
-        <div className="space-y-3">
+      <Cartao className="overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-stroke-list px-4 py-3">
+          <h3 className="text-[14px] leading-5 font-bold text-ink-heading">
+            Situação da produção
+          </h3>
+          {/*
+            O estado vira etiqueta, não caixa de aviso. "Esta é a peça atual"
+            ocupava a largura inteira num quadro de alerta, e não é alerta
+            nenhum: é o estado normal de uma das dezoito peças.
+          */}
           {peca.status === "concluida" ? (
-            <Aviso tom="positivo">
-              Peça concluída. As participações de quem estava escalado foram registradas no
-              histórico.
-            </Aviso>
-          ) : null}
-
-          {peca.atual ? (
-            <Aviso tom="info">Esta é a peça atual do teatro.</Aviso>
-          ) : peca.status === "concluida" ? null : (
-            <Botao variante="ghost" onClick={() => void tornarAtual()} disabled={enviando}>
-              Definir como peça atual
-            </Botao>
+            <Tag tom="positivo">Concluída</Tag>
+          ) : peca.atual ? (
+            <Tag tom="areia">Peça atual</Tag>
+          ) : (
+            <Tag>Fora de cartaz</Tag>
           )}
         </div>
 
-        {peca.status !== "concluida" ? (
-          <>
-            <Divisor className="my-4" />
-            <p className="mb-3 text-[13px] leading-5 text-ink-caption">
-              Concluir a peça registra a participação de cada pessoa escalada no histórico dela e
-              retira a peça da posição de peça atual.
+        <div className="space-y-3.5 px-4 py-4">
+          {peca.status === "concluida" ? (
+            <p className="text-[13px] leading-5 text-ink-body">
+              As participações de quem estava escalado já foram registradas no histórico de cada
+              um.
             </p>
-            <Botao variante="ghost" onClick={() => setConfirmando(true)} disabled={enviando}>
-              Concluir peça
-            </Botao>
-          </>
-        ) : null}
+          ) : (
+            <>
+              <p className="text-[13px] leading-5 text-ink-caption">
+                {peca.atual
+                  ? "É esta que os participantes veem ao abrir o app, com personagem, roteiro e ensaios."
+                  : "Somente uma peça é a peça atual. Ao definir esta, a anterior deixa de ser."}
+              </p>
+              {peca.atual ? null : (
+                <Botao variante="ghost" onClick={() => void tornarAtual()} disabled={enviando}>
+                  Definir como peça atual
+                </Botao>
+              )}
+
+              <Divisor />
+
+              {/*
+                O número entra na frase. "Registra a participação de cada pessoa
+                escalada" não dizia quantas são, e é justamente o que a direção
+                precisa saber antes de apertar um botão que escreve histórico.
+              */}
+              <p className="text-[13px] leading-5 text-ink-caption">
+                Concluir retira a peça de cartaz e registra a participação{" "}
+                {escalados === 0
+                  ? "de quem estiver escalado — hoje, ninguém."
+                  : `de ${pluralizar(escalados, "pessoa escalada", "pessoas escaladas")} no histórico delas.`}
+              </p>
+              <Botao variante="ghost" onClick={() => setConfirmando(true)} disabled={enviando}>
+                Concluir peça
+              </Botao>
+            </>
+          )}
+        </div>
       </Cartao>
+
 
       <Modal
         titulo="Concluir a peça?"

@@ -201,8 +201,16 @@ function ConteudoPeca() {
 
         {aba === "dados" ? (
           <AbaDados
-            // Recarregar a peça reinicia o formulário com os dados salvos.
-            key={`${peca.status}-${peca.atual}-${peca.titulo}`}
+            /*
+             * Só o id na chave. A chave anterior incluía `titulo` e `status`,
+             * que são campos do próprio formulário: salvar trocava a chave,
+             * remontava o componente e o aviso "Dados salvos" desaparecia
+             * antes de ser visto — mas só quando a edição tocava num desses
+             * dois, então a confirmação aparecia ou não dependendo do campo.
+             * O formulário agora sincroniza o que grava, sem depender de
+             * remontar.
+             */
+            key={peca.id}
             peca={peca}
             escalados={escalados}
             onAtualizar={dados.recarregar}
