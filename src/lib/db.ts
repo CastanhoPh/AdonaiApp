@@ -450,11 +450,42 @@ export async function criarPeca(dados: NovaPeca): Promise<string> {
   return ref.id;
 }
 
+/**
+ * Atualiza a peça e leva as mudanças para as cópias no histórico.
+ *
+ * A participação guarda `playTitulo`, `playEvento`, `playCapaUrl` e `periodo`
+ * para o histórico de alguém não depender de a peça continuar existindo. O
+ * preço é que renomear ou redatar uma peça já encerrada deixava todas as
+ * fichas mostrando o nome e a data antigos — e o histórico é justamente onde
+ * ninguém repara que ficou desatualizado.
+ *
+ * Só peça encerrada tem participação; nas outras o laço não acha nada e não
+ * custa quase nada.
+ */
 export async function atualizarPeca(id: string, dados: Partial<Play>): Promise<void> {
   const limpo = { ...dados };
   delete limpo.id;
   delete limpo.atual; // trocar a peça atual passa por definirPecaAtual
-  await updateDoc(doc(db, "plays", id), limpo);
+
+  /* Só o que aparece copiado, e só quando veio no pedido. */
+  const naParticipacao: Record<string, string> = {};
+  if (typeof limpo.titulo === "string") naParticipacao.playTitulo = limpo.titulo;
+  if (typeof limpo.nomeEvento === "string") naParticipacao.playEvento = limpo.nomeEvento;
+  if (typeof limpo.capaUrl === "string") naParticipacao.playCapaUrl = limpo.capaUrl;
+  if (typeof limpo.dataApresentacao === "string") naParticipacao.periodo = limpo.dataApresentacao;
+
+  if (Object.keys(naParticipacao).length === 0) {
+    await updateDoc(doc(db, "plays", id), limpo);
+    return;
+  }
+
+  const ligadas = await getDocs(
+    query(collection(db, "participations"), where("playId", "==", id)),
+  );
+  const lote = writeBatch(db);
+  lote.update(doc(db, "plays", id), limpo);
+  ligadas.docs.forEach((p) => lote.update(p.ref, naParticipacao));
+  await lote.commit();
 }
 
 /**
