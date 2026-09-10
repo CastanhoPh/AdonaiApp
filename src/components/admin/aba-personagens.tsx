@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { ImageSquare, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import {
   atualizarPersonagem,
   criarPersonagem,
@@ -138,11 +138,24 @@ export function AbaPersonagens({
     if (ok) setRemovendo(null);
   }
 
+
+  const semAtor = personagens.filter((p) => !p.personId).length;
+  /*
+   * A coluna da miniatura só existe quando alguma imagem existe.
+   *
+   * Ela serve para a direção ver de relance qual papel já tem referência
+   * visual — informação que só faz sentido quando há alguma. Numa peça sem
+   * imagem nenhuma, o que aparecia era uma coluna de treze caixas vazias
+   * idênticas. Como a coluna aparece ou desaparece para a lista inteira, o
+   * alinhamento das linhas se mantém nos dois casos.
+   */
+  const algumComImagem = personagens.some((p) => p.imagemUrl);
+
   return (
     <div>
       <TituloSecao
         titulo="Personagens"
-        descricao="Cada personagem pertence a esta peça e recebe no máximo uma pessoa."
+        descricao="Cada personagem recebe no máximo uma pessoa. As características desejadas alimentam as sugestões na aba Elenco."
         acao={
           <Botao onClick={abrirNovo} className="gap-1.5">
             <Plus size={15} />
@@ -164,81 +177,136 @@ export function AbaPersonagens({
           acao={<Botao onClick={abrirNovo}>Novo personagem</Botao>}
         />
       ) : (
-        <ul className="space-y-3">
-          {personagens.map((personagem) => {
-            const desejadas = caracteristicas.filter((t) =>
-              personagem.caracteristicasDesejadas?.includes(t.id),
-            );
-            const falas = falasPorPersonagem.get(personagem.id) ?? 0;
-            return (
-              <li key={personagem.id}>
-                <Cartao className="px-4 py-3.5">
-                  <div className="flex items-start justify-between gap-3">
-                    {/* Miniatura para a direção conferir de relance qual papel já tem imagem. */}
-                    {personagem.imagemUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={personagem.imagemUrl}
-                        alt=""
-                        className="h-14 w-20 shrink-0 rounded-[8px] border border-stroke-frame object-cover"
-                      />
-                    ) : null}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[15px] leading-[22px] font-bold text-ink-heading">
+        /*
+          Uma moldura para a lista inteira, com as linhas separadas por fio.
+          Antes cada personagem era um cartão de 180px — nome, tipo, descrição e
+          etiquetas empilhados um por linha —, e quatro papéis já enchiam a tela
+          de uma peça que costuma ter treze.
+        */
+        <Cartao className="overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-stroke-list px-4 py-3">
+            <h3 className="text-[14px] leading-5 font-bold text-ink-heading">
+              {personagens.length} {personagens.length === 1 ? "personagem" : "personagens"}
+            </h3>
+            {semAtor > 0 ? (
+              <Tag tom="aviso">{semAtor} sem ator</Tag>
+            ) : (
+              <Status tom="positivo">Todos com ator</Status>
+            )}
+          </div>
+
+          <ul>
+            {personagens.map((personagem) => {
+              const desejadas = caracteristicas.filter((t) =>
+                personagem.caracteristicasDesejadas?.includes(t.id),
+              );
+              const falas = falasPorPersonagem.get(personagem.id) ?? 0;
+              return (
+                <li
+                  key={personagem.id}
+                  /*
+                    Quebra por conta própria: as larguras mínimas abaixo é que
+                    empurram as ações e as etiquetas para a linha seguinte
+                    quando a tela é estreita. Sem elas, no celular o nome
+                    encolhia para os botões caberem ao lado.
+                  */
+                  className="flex flex-wrap items-start gap-x-3 gap-y-2 border-b border-stroke-list px-4 py-2.5 last:border-0"
+                >
+                  {/*
+                    A miniatura existe para a direção ver de relance qual papel
+                    já tem imagem de referência. Por isso o lugar aparece
+                    sempre: só mostrar quando há imagem deixava cada linha
+                    começando num ponto diferente, e escondia justamente a
+                    informação de que falta imagem.
+                  */}
+                  {!algumComImagem ? null : personagem.imagemUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={personagem.imagemUrl}
+                      alt=""
+                      className="h-[34px] w-[48px] shrink-0 rounded-[6px] border border-stroke-frame object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="grid h-[34px] w-[48px] shrink-0 place-items-center rounded-[6px] border border-dashed border-stroke-frame text-ink-disabled"
+                    >
+                      <ImageSquare size={15} />
+                    </span>
+                  )}
+
+                  <div className="min-w-[190px] flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <p className="text-[14px] leading-[21px] font-medium text-ink-heading">
                         {personagem.nome}
                       </p>
-                      <p className="text-[13px] leading-5 text-ink-caption">
+                      <p className="text-[11.5px] leading-4 text-ink-caption">
                         {ROLE_TYPE_LABEL[personagem.tipoPapel]}
                         {falas > 0 ? ` · ${falas} ${falas === 1 ? "fala" : "falas"}` : ""}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Status tom={personagem.personId ? "positivo" : "aviso"}>
-                        {personagem.personNome ? nomeCurto(personagem.personNome) : "Sem ator"}
-                      </Status>
-                      <BotaoIcone
-                        rotulo={`Editar ${personagem.nome}`}
-                        onClick={() => abrirEdicao(personagem)}
-                      >
-                        <PencilSimple size={17} />
-                      </BotaoIcone>
-                      <BotaoIcone
-                        rotulo={`Remover ${personagem.nome}`}
-                        onClick={() => setRemovendo(personagem)}
-                        className="hover:text-[#e4796c]"
-                      >
-                        <Trash size={17} />
-                      </BotaoIcone>
-                    </div>
+
+                    {personagem.descricao || desejadas.length > 0 ? (
+                      /*
+                        A descrição cresce e empurra as etiquetas para a direita,
+                        então elas terminam no mesmo ponto em todas as linhas.
+                        Antes começavam onde a descrição acabava, e cada linha
+                        tinha as suas num lugar diferente.
+                      */
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <p className="min-w-[100px] flex-1 truncate text-[12.5px] leading-[18px] text-ink-body">
+                          {personagem.descricao}
+                        </p>
+                        {desejadas.length > 0 ? (
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            {desejadas.map((t) => (
+                              <Tag key={t.id} tom="info">
+                                {t.nome}
+                              </Tag>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {personagem.observacoes ? (
+                      <p className="mt-1.5 line-clamp-2 border-l-2 border-brand pl-2.5 text-[12px] leading-[18px] text-ink-caption">
+                        {personagem.observacoes}
+                      </p>
+                    ) : null}
                   </div>
 
-                  {personagem.descricao ? (
-                    <p className="mt-2 text-[13px] leading-5 text-ink-body">
-                      {personagem.descricao}
-                    </p>
-                  ) : null}
-
-                  {desejadas.length > 0 ? (
-                    <div className="mt-2.5 flex flex-wrap gap-2">
-                      {desejadas.map((t) => (
-                        <Tag key={t.id} tom="info">
-                          {t.nome}
-                        </Tag>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {personagem.observacoes ? (
-                    <p className="mt-2.5 border-l-2 border-brand pl-3 text-[13px] leading-5 whitespace-pre-line text-ink-caption">
-                      {personagem.observacoes}
-                    </p>
-                  ) : null}
-                </Cartao>
-              </li>
-            );
-          })}
-        </ul>
+                  {/*
+                    Largura mínima fixa: sem ela a coluna acompanhava o tamanho
+                    do nome do ator, e como cada linha tem um nome diferente as
+                    etiquetas ao lado terminavam num ponto diferente em cada
+                    uma. Com a coluna estável, nomes e etiquetas se alinham.
+                  */}
+                  <div className="ml-auto flex min-w-[200px] shrink-0 items-center justify-end gap-0.5">
+                    <Status tom={personagem.personId ? "positivo" : "aviso"}>
+                      {personagem.personNome ? nomeCurto(personagem.personNome) : "Sem ator"}
+                    </Status>
+                    <BotaoIcone
+                      rotulo={`Editar ${personagem.nome}`}
+                      onClick={() => abrirEdicao(personagem)}
+                    >
+                      <PencilSimple size={16} />
+                    </BotaoIcone>
+                    <BotaoIcone
+                      rotulo={`Remover ${personagem.nome}`}
+                      onClick={() => setRemovendo(personagem)}
+                      className="hover:text-state-negative"
+                    >
+                      <Trash size={16} />
+                    </BotaoIcone>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Cartao>
       )}
+
 
       <Modal
         titulo={editandoId ? "Editar personagem" : "Novo personagem"}

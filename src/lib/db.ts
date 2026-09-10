@@ -6,6 +6,7 @@ import {
   arrayUnion,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc as getDocDoSdk,
   getDocFromCache,
@@ -368,6 +369,26 @@ export function definirCaracteristicasDaPessoa(personId: string, ids: string[]):
 
 export function definirCaracteristicasDoPapel(characterId: string, ids: string[]): Promise<void> {
   return definirAtribuicao("papeis", characterId, ids);
+}
+
+/**
+ * Esquece as características de um papel apagado.
+ *
+ * As atribuições moram fora do documento do personagem — num único documento
+ * que só a direção lê —, então apagar o personagem não levava as dela. Cada
+ * remoção deixava uma entrada apontando para um id que não existe mais, para
+ * sempre. Não quebra nada, mas é lixo que só cresce.
+ *
+ * O caminho pontilhado apaga a chave daquele id sem reescrever o resto do
+ * documento. Falha em silêncio quando não há documento: aí não há o que
+ * esquecer, e não é motivo para a remoção do personagem falhar.
+ */
+async function esquecerCaracteristicasDoPapel(characterId: string): Promise<void> {
+  try {
+    await updateDoc(REF_ATRIBUICOES(), { [`papeis.${characterId}`]: deleteField() });
+  } catch {
+    // Documento inexistente ou sem a chave: nada a fazer.
+  }
 }
 
 /** Mescla a atribuição nos objetos que as telas da direção já esperam. */
@@ -734,6 +755,7 @@ export async function atualizarPersonagem(
 
 export async function removerPersonagem(playId: string, id: string): Promise<void> {
   await deleteDoc(doc(db, "plays", playId, "characters", id));
+  await esquecerCaracteristicasDoPapel(id);
 }
 
 /**
