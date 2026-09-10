@@ -142,6 +142,23 @@ export interface PersonNotes {
   atualizadoEm: string;
 }
 
+/**
+ * Exercício de preparação com vídeo. Documento em `exercicios/{id}`.
+ *
+ * O link fica guardado como a direção colou, e é interpretado só na hora de
+ * mostrar: o YouTube entrega endereços diferentes conforme de onde foram
+ * copiados, e normalizar na gravação obrigaria a direção a saber disso.
+ */
+export interface Exercise {
+  id: string;
+  nome: string;
+  objetivo: string;
+  youtubeUrl: string;
+  /** Posição na lista, que é a ordem em que a direção quer que sejam feitos. */
+  ordem: number;
+  criadoEm: string;
+}
+
 /** Característica de atuação selecionável. Documento em `traits/{traitId}`. */
 export interface Trait {
   id: string;

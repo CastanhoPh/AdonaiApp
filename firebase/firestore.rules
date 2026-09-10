@@ -159,6 +159,14 @@ service cloud.firestore {
       allow read, write: if ehAdmin();
     }
 
+    // ------------------------------------------------- exercícios
+    // Todo o elenco lê; só a direção monta a lista. Não há nada de pessoal
+    // aqui: é o mesmo material de preparação para todos.
+    match /exercicios/{exercicioId} {
+      allow get, list: if autenticado();
+      allow write: if ehAdmin();
+    }
+
     // --------------------------------------------------- convites
     // Só a direção gera e enxerga os convites. Quem resgata é uma função com
     // credencial de servidor, que não passa por estas regras — por isso quem

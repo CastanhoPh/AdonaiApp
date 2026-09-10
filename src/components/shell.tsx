@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Barbell,
   BellRinging,
   CalendarDots,
   CaretLeft,
@@ -239,9 +240,16 @@ interface ItemNav {
   Icone: typeof House;
 }
 
+/*
+ * Início no centro, com dois vizinhos de cada lado.
+ *
+ * É a aba que se abre mais vezes, e no celular o meio da barra é o lugar mais
+ * fácil de alcançar com o polegar — nas pontas a mão precisa se reposicionar.
+ */
 const NAV_PARTICIPANTE: ItemNav[] = [
-  { href: "/inicio", rotulo: "Início", Icone: House },
+  { href: "/exercicios", rotulo: "Exercícios", Icone: Barbell },
   { href: "/roteiro", rotulo: "Roteiro", Icone: Scroll },
+  { href: "/inicio", rotulo: "Início", Icone: House },
   { href: "/ensaios", rotulo: "Ensaios", Icone: CalendarDots },
   { href: "/perfil", rotulo: "Perfil", Icone: User },
 ];
@@ -251,6 +259,7 @@ const NAV_ADMIN: ItemNav[] = [
   { href: "/admin/pessoas", rotulo: "Pessoas", Icone: UsersThree },
   { href: "/admin/pecas", rotulo: "Peças", Icone: PuzzlePiece },
   { href: "/admin/ensaios", rotulo: "Ensaios", Icone: CalendarDots },
+  { href: "/admin/exercicios", rotulo: "Exercícios", Icone: Barbell },
   { href: "/admin/avisos", rotulo: "Avisos", Icone: BellRinging },
 ];
 
@@ -274,12 +283,13 @@ function TabBar() {
                 href={href}
                 aria-current={selecionado ? "page" : undefined}
                 className={juntar(
-                  "flex min-h-12 flex-col items-center justify-center gap-1 rounded-[8px] text-[11px] font-medium transition-colors",
+                  "flex min-h-12 flex-col items-center justify-center gap-1 rounded-[8px] px-0.5 text-center text-[11px] leading-[14px] font-medium transition-colors",
                   selecionado ? "text-brand-strong" : "text-ink-tab hover:text-ink-heading",
                 )}
               >
                 <Icone size={22} />
-                {rotulo}
+                {/* Cinco colunas num celular estreito: o rótulo não quebra. */}
+                <span className="w-full truncate">{rotulo}</span>
               </Link>
             </li>
           );
