@@ -1,18 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle, MagnifyingGlass } from "@phosphor-icons/react";
+import { ArrowUpRight, CheckCircle, MagnifyingGlass, UserMinus } from "@phosphor-icons/react";
 import { atualizarPersonagem, escalarPessoa } from "@/lib/db";
-import { nomeCurto, normalizar, pluralizar } from "@/lib/format";
+import { nomeCurto, normalizar } from "@/lib/format";
 import { useEnvio } from "@/lib/hooks";
 import { ROLE_TYPE_LABEL, type Character, type Person, type Trait } from "@/lib/types";
 import {
   Avatar,
   Aviso,
   Botao,
+  BotaoIcone,
   Cartao,
-  Divisor,
   Entrada,
   Status,
   Tag,
@@ -97,6 +97,21 @@ export function AbaElenco({
   const { enviando, erro, enviar } = useEnvio();
   const [emFoco, setEmFoco] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
+
+  /*
+   * No celular as duas colunas viram uma, e a lista de personagens é alta: numa
+   * peça de treze papéis o painel do escolhido nasce abaixo da dobra. Tocar num
+   * personagem e não ver nada acontecer é o pior resultado possível aqui, então
+   * a escolha leva a tela até o painel. No computador as duas colunas estão
+   * lado a lado e rolar seria atrapalhar.
+   */
+  const painel = useRef<HTMLDivElement>(null);
+  function escolher(id: string) {
+    setEmFoco(id);
+    if (window.matchMedia("(max-width: 899px)").matches) {
+      painel.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
 
   const nomeTrait = useMemo(
     () => new Map(caracteristicas.map((t) => [t.id, t.nome])),
@@ -191,207 +206,273 @@ export function AbaElenco({
         </div>
       ) : null}
 
-      {pendentes.length > 0 ? (
-        <div className="mb-4">
-          <Aviso tom="aviso">
-            {pluralizar(pendentes.length, "personagem ainda sem ator", "personagens ainda sem ator")}
-            : {pendentes.map((p) => p.nome).join(", ")}.
-          </Aviso>
-        </div>
-      ) : (
-        <div className="mb-4">
-          <Aviso tom="positivo">Todos os personagens têm alguém escalado.</Aviso>
-        </div>
-      )}
+      {/*
+        Duas colunas com papéis distintos: à esquerda a lista para escolher, à
+        direita tudo sobre o personagem escolhido.
+        Antes as ações do personagem abriam dentro da própria linha da lista, o
+        que empurrava os itens de baixo a cada clique — a lista se mexia
+        justamente enquanto a direção estava mirando nela.
+      */}
+      <div className="grid items-start gap-4 min-[900px]:grid-cols-2">
+        <Cartao className="overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-stroke-list px-4 py-3">
+            <h3 className="text-[14px] leading-5 font-bold text-ink-heading">Personagens</h3>
+            {pendentes.length > 0 ? (
+              <Tag tom="aviso">{pendentes.length} sem ator</Tag>
+            ) : (
+              <Status tom="positivo">Elenco completo</Status>
+            )}
+          </div>
 
-      <div className="grid gap-4 min-[900px]:grid-cols-2">
-        {/* Personagens da peça */}
-        <Cartao className="px-4 py-4">
-          <h3 className="mb-3 text-[15px] leading-6 font-bold text-ink-heading">
-            Personagens da peça
-          </h3>
           <ul>
             {personagens.map((personagem) => {
               const foco = personagem.id === personagemFoco?.id;
-              const falas = falasPorPersonagem.get(personagem.id) ?? 0;
+              const ator = personagem.personId ? porId.get(personagem.personId) : null;
+              const pendente = Boolean(personagem.personId) && personagem.situacao !== "confirmado";
               return (
-                <li key={personagem.id} className="border-b border-stroke-list last:border-0">
+                <li key={personagem.id}>
                   <button
                     type="button"
-                    onClick={() => setEmFoco(personagem.id)}
+                    onClick={() => escolher(personagem.id)}
                     className={juntar(
-                      "flex w-full items-center justify-between gap-3 px-2 py-3 text-left transition-colors",
-                      foco ? "bg-brand/14" : "hover:bg-surface-hover",
+                      "flex w-full items-center gap-3 border-b border-l-2 border-b-stroke-list px-3.5 py-2.5 text-left transition-colors last:border-b-0",
+                      foco
+                        ? "border-l-brand bg-brand/12"
+                        : "border-l-transparent hover:bg-surface-hover",
                     )}
                   >
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] leading-[21px] font-medium text-ink-heading">
-                        {personagem.nome}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span className="truncate text-[14px] leading-[21px] font-medium text-ink-heading">
+                          {personagem.nome}
+                        </span>
+                        {/*
+                          O ponto âmbar só aparece quando há o que resolver.
+                          Antes cada linha carregava a etiqueta "Confirmado",
+                          que é o estado normal de quase todas — oito
+                          repetições da mesma informação escondiam justamente a
+                          linha diferente.
+                        */}
+                        {pendente ? (
+                          <span
+                            aria-label="Escalação pendente"
+                            className="size-1.5 shrink-0 rounded-full bg-state-warning"
+                          />
+                        ) : null}
                       </span>
-                      <span className="block text-[12px] leading-[18px] text-ink-caption">
-                        {foco && !personagem.personId
-                          ? "Selecionado · escalando agora"
-                          : `${ROLE_TYPE_LABEL[personagem.tipoPapel]}${falas > 0 ? ` · ${falas} falas` : ""}`}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[13px] leading-5 text-ink-body">
-                        {personagem.personNome ? nomeCurto(personagem.personNome) : "Não definido"}
+                      <span className="block truncate text-[11.5px] leading-4 text-ink-caption">
+                        {ROLE_TYPE_LABEL[personagem.tipoPapel]}
                       </span>
                     </span>
-                    <span className="shrink-0">
-                      <Status tom={personagem.situacao === "confirmado" ? "positivo" : "aviso"}>
-                        {personagem.situacao === "confirmado" ? "Confirmado" : "Pendente"}
-                      </Status>
+
+                    <span className="flex shrink-0 items-center gap-2">
+                      {ator ? (
+                        <>
+                          <Avatar nome={ator.nome} url={ator.fotoUrl} tamanho={28} />
+                          <span className="max-w-[150px] truncate text-[13px] leading-5 text-ink-body">
+                            {nomeCurto(ator.nome)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[12px] leading-[18px] text-state-warning">
+                          Sem ator
+                        </span>
+                      )}
                     </span>
                   </button>
-
-                  {foco && personagem.personId ? (
-                    <div className="flex flex-wrap gap-2 px-2 pb-3">
-                      <Botao
-                        variante="ghost"
-                        onClick={() => void alternarSituacao(personagem)}
-                        disabled={enviando}
-                      >
-                        {personagem.situacao === "confirmado"
-                          ? "Marcar como pendente"
-                          : "Confirmar"}
-                      </Botao>
-                      <Botao
-                        variante="perigo"
-                        onClick={() => void escalar(personagem, null)}
-                        disabled={enviando}
-                      >
-                        Retirar da escalação
-                      </Botao>
-                    </div>
-                  ) : null}
                 </li>
               );
             })}
           </ul>
         </Cartao>
 
-        {/* Candidatos */}
-        <Cartao className="px-4 py-4">
-          {!personagemFoco ? (
-            <p className="text-[13px] text-ink-caption">
-              Escolha um personagem à esquerda para ver candidatos.
-            </p>
-          ) : (
-            <>
-              <h3 className="text-[15px] leading-6 font-bold text-ink-heading">
-                Candidatos para “{personagemFoco.nome}”
-              </h3>
-              <p className="mt-0.5 mb-3 text-[12px] leading-[18px] text-ink-caption">
-                {(personagemFoco.caracteristicasDesejadas ?? []).length > 0
-                  ? `Desejado: ${(personagemFoco.caracteristicasDesejadas ?? [])
-                      .map((id) => nomeTrait.get(id))
-                      .filter(Boolean)
-                      .join(", ")}`
-                  : "Nenhuma característica desejada definida para este papel."}
+        {/*
+          O painel do personagem em foco. Fica fixo na rolagem porque a lista
+          ao lado passa da altura dele quando a peça tem muitos papéis.
+        */}
+        <div
+          ref={painel}
+          className="scroll-mt-20 min-[900px]:sticky min-[900px]:top-4"
+        >
+          <Cartao className="overflow-hidden">
+            {!personagemFoco ? (
+              <p className="px-4 py-4 text-[13px] text-ink-caption">
+                Escolha um personagem à esquerda.
               </p>
+            ) : (
+              <>
+                <div className="border-b border-stroke-list px-4 py-3.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-[17px] leading-6 font-bold text-ink-heading">
+                      {personagemFoco.nome}
+                    </h3>
+                    <Tag tom="areia">{ROLE_TYPE_LABEL[personagemFoco.tipoPapel]}</Tag>
+                    {(falasPorPersonagem.get(personagemFoco.id) ?? 0) > 0 ? (
+                      <span className="text-[12px] leading-[18px] text-ink-caption">
+                        {falasPorPersonagem.get(personagemFoco.id)} falas
+                      </span>
+                    ) : null}
+                  </div>
 
-              <div className="relative mb-3">
-                <MagnifyingGlass
-                  size={16}
-                  aria-hidden
-                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-caption"
-                />
-                <Entrada
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar pelo nome"
-                  aria-label="Buscar candidato pelo nome"
-                  className="pl-9"
-                />
-              </div>
+                  {personagemFoco.personId ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-[8px] border border-stroke-frame bg-surface-raised px-3 py-2.5">
+                      <Avatar
+                        nome={personagemFoco.personNome}
+                        url={porId.get(personagemFoco.personId)?.fotoUrl}
+                        tamanho={40}
+                      />
+                      <div className="min-w-[150px] flex-1">
+                        <Link
+                          href={`/admin/pessoas/detalhe?id=${personagemFoco.personId}`}
+                          className="flex items-center gap-1 text-[14px] leading-[21px] font-medium text-ink-heading hover:text-brand-strong"
+                        >
+                          <span className="truncate">{personagemFoco.personNome}</span>
+                          <ArrowUpRight size={13} className="shrink-0" />
+                        </Link>
+                        <Status tom={personagemFoco.situacao === "confirmado" ? "positivo" : "aviso"}>
+                          {personagemFoco.situacao === "confirmado" ? "Confirmado" : "Pendente"}
+                        </Status>
+                      </div>
+                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                        <Botao
+                          variante="ghost"
+                          onClick={() => void alternarSituacao(personagemFoco)}
+                          disabled={enviando}
+                        >
+                          {personagemFoco.situacao === "confirmado" ? "Marcar pendente" : "Confirmar"}
+                        </Botao>
+                        <BotaoIcone
+                          rotulo="Retirar da escalação"
+                          onClick={() => void escalar(personagemFoco, null)}
+                          className="hover:text-state-negative"
+                        >
+                          <UserMinus size={16} />
+                        </BotaoIcone>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-[13px] leading-5 text-ink-caption">
+                      Ninguém escalado neste papel.
+                    </p>
+                  )}
+                </div>
 
-              {visiveis.length === 0 ? (
-                <p className="text-[13px] text-ink-caption">
-                  {busca
-                    ? `Ninguém no cadastro com “${busca}”.`
-                    : "Nenhuma pessoa cadastrada. Cadastre integrantes na tela Pessoas."}
-                </p>
-              ) : (
-                <ul className="space-y-2.5">
-                  {visiveis.map((candidato, indice) => {
-                    const escaladaAqui = personagemFoco.personId === candidato.pessoa.id;
-                    return (
-                      <li
-                        key={candidato.pessoa.id}
-                        className="flex items-center gap-3 rounded-[8px] border border-stroke-frame px-3 py-2.5"
-                      >
-                        <Avatar
-                          nome={candidato.pessoa.nome}
-                          url={candidato.pessoa.fotoUrl}
-                          tamanho={40}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[14px] leading-[21px] font-medium text-ink-heading">
-                            {nomeCurto(candidato.pessoa.nome)}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                            {candidato.atende.map((id) => (
-                              <Tag key={id} tom="info">
-                                {nomeTrait.get(id)}
-                              </Tag>
-                            ))}
-                            {candidato.pessoa.ativo === false ? (
-                              /* Sem acesso ao app: escalável, mas não recebe aviso nem confirma presença. */
-                              <Tag tom="aviso">Sem acesso</Tag>
-                            ) : null}
-                            {candidato.jaEscaladaEm ? (
-                              <span className="text-[11px] leading-4 text-ink-caption">
-                                Já escalado em {candidato.jaEscaladaEm}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        {escaladaAqui ? (
-                          <Status tom="positivo">Escalado</Status>
-                        ) : (
-                          <Botao
-                            variante={indice === 0 && candidato.cobreTudo ? "primario" : "ghost"}
-                            onClick={() => void escalar(personagemFoco, candidato.pessoa.id)}
-                            disabled={enviando}
-                          >
-                            Escalar
-                          </Botao>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                <div className="px-4 py-3.5">
+                  <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <h4 className="text-[13px] leading-5 font-bold text-ink-heading">Sugestões</h4>
+                    <span className="text-[11.5px] leading-4 text-ink-caption">
+                      {(personagemFoco.caracteristicasDesejadas ?? []).length > 0
+                        ? `Desejado: ${(personagemFoco.caracteristicasDesejadas ?? [])
+                            .map((id) => nomeTrait.get(id))
+                            .filter(Boolean)
+                            .join(", ")}`
+                        : "Sem característica desejada"}
+                    </span>
+                  </div>
 
-              {/* O corte precisa ser visível: senão a direção acha que o resto do grupo não existe. */}
-              {encontrados.length > visiveis.length ? (
-                <p className="mt-2.5 text-[12px] leading-[18px] text-ink-caption">
-                  Mostrando {visiveis.length} de {encontrados.length}. Busque pelo nome para achar
-                  quem não está aqui.
-                </p>
-              ) : null}
+                  <div className="relative">
+                    <MagnifyingGlass
+                      size={16}
+                      aria-hidden
+                      className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-caption"
+                    />
+                    <Entrada
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      placeholder="Buscar pelo nome"
+                      aria-label="Buscar candidato pelo nome"
+                      className="pl-9"
+                    />
+                  </div>
 
-              {personagemFoco.personId ? (
-                <>
-                  <Divisor className="my-3.5" />
-                  <Link
-                    href={`/admin/pessoas/detalhe?id=${personagemFoco.personId}`}
-                    className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-strong hover:underline"
-                  >
-                    Ver perfil de {nomeCurto(personagemFoco.personNome)}
-                    <ArrowUpRight size={14} />
-                  </Link>
-                </>
-              ) : null}
-            </>
-          )}
-        </Cartao>
+                  {visiveis.length === 0 ? (
+                    <p className="mt-3 text-[13px] text-ink-caption">
+                      {busca
+                        ? `Ninguém no cadastro com “${busca}”.`
+                        : "Nenhuma pessoa cadastrada. Cadastre integrantes na tela Pessoas."}
+                    </p>
+                  ) : (
+                    /*
+                      Linhas separadas por fio, não uma caixa por pessoa: oito
+                      molduras empilhadas competiam com a moldura do cartão.
+                    */
+                    <ul className="mt-1 divide-y divide-stroke-list">
+                      {visiveis.map((candidato, indice) => {
+                        const escaladaAqui = personagemFoco.personId === candidato.pessoa.id;
+                        const sugerida = indice === 0 && candidato.cobreTudo;
+                        const temMarca =
+                          candidato.atende.length > 0 ||
+                          candidato.pessoa.ativo === false ||
+                          Boolean(candidato.jaEscaladaEm);
+                        return (
+                          <li key={candidato.pessoa.id} className="flex items-center gap-2.5 py-2">
+                            <Avatar
+                              nome={candidato.pessoa.nome}
+                              url={candidato.pessoa.fotoUrl}
+                              tamanho={28}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[13.5px] leading-5 font-medium text-ink-heading">
+                                {nomeCurto(candidato.pessoa.nome)}
+                              </p>
+                              {temMarca ? (
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                  {candidato.atende.map((id) => (
+                                    <Tag key={id} tom="info">
+                                      {nomeTrait.get(id)}
+                                    </Tag>
+                                  ))}
+                                  {candidato.pessoa.ativo === false ? (
+                                    /* Sem acesso ao app: escalável, mas não recebe aviso nem confirma presença. */
+                                    <Tag tom="aviso">Sem acesso</Tag>
+                                  ) : null}
+                                  {candidato.jaEscaladaEm ? (
+                                    <span className="text-[11px] leading-4 text-ink-caption">
+                                      também em {candidato.jaEscaladaEm}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                            {escaladaAqui ? (
+                              <Status tom="positivo">Escalado</Status>
+                            ) : (
+                              <Botao
+                                variante={sugerida ? "primario" : "ghost"}
+                                onClick={() => void escalar(personagemFoco, candidato.pessoa.id)}
+                                disabled={enviando}
+                              >
+                                Escalar
+                              </Botao>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  {/* O corte precisa ser visível: senão a direção acha que o resto do grupo não existe. */}
+                  {encontrados.length > visiveis.length ? (
+                    <p className="mt-2.5 text-[12px] leading-[18px] text-ink-caption">
+                      Mostrando {visiveis.length} de {encontrados.length}. Busque pelo nome para achar
+                      quem não está aqui.
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </Cartao>
+        </div>
       </div>
 
+      {/*
+        A regra mudou quando a direção passou a registrar quem acumulou papéis:
+        escalar em outro personagem não mexe mais no anterior. O texto antigo
+        prometia o contrário, e era a única explicação da tela.
+      */}
       <p className="mt-4 text-[12px] leading-[18px] text-ink-caption">
-        Uma pessoa interpreta apenas um personagem por peça: ao escalá-la em outro papel, o
-        anterior volta para pendente. A participação entra no histórico da pessoa quando a peça for
-        concluída.
+        A mesma pessoa pode fazer mais de um personagem na peça — quem já está em outro papel
+        aparece marcado. A participação entra no histórico dela quando a peça for concluída.
       </p>
     </div>
   );
