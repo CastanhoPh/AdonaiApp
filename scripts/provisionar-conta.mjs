@@ -96,10 +96,32 @@ export async function provisionarConta({ role }) {
   }
 
   // ---------------------------------------------------------------- users
-  await db.collection("users").doc(usuario.uid).set(
-    { nome, email, role, personId, criadoEm: new Date().toISOString() },
+  /*
+   * `criadoEm` só na criação.
+   *
+   * Este script também serve para promover uma conta que já existe, e a versão
+   * anterior mandava `criadoEm: agora` no merge — o que apagava a data real de
+   * criação da conta e a substituía pela data da promoção. Silencioso, e
+   * irrecuperável depois.
+   */
+  const documentoDaConta = db.collection("users").doc(usuario.uid);
+  const contaExistente = await documentoDaConta.get();
+  await documentoDaConta.set(
+    {
+      nome,
+      email,
+      role,
+      personId,
+      ...(contaExistente.exists ? {} : { criadoEm: new Date().toISOString() }),
+    },
     { merge: true },
   );
+  if (contaExistente.exists) {
+    const antes = contaExistente.data();
+    if (antes.role !== role) {
+      console.log(`  Papel: ${antes.role} → ${role}`);
+    }
+  }
 
   console.log(`\n  ${email} está configurado como ${PAPEIS[role]} (${PROJECT_ID}).`);
 
