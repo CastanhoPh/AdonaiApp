@@ -224,8 +224,15 @@ export default function Pessoas() {
    * "Direção" e "Sem e-mail". Em 0.9fr as etiquetas quebravam para a linha de
    * baixo e só as linhas que as tinham ficavam mais altas, o que deixava a
    * tabela com um passo irregular.
+   *
+   * As colunas de característica têm `max-content` como piso: o nome da
+   * característica é escolhido pela direção e pode ser longo — "Noção de
+   * espaço" já não cabia e quebrava o cabeçalho em duas linhas. Com o piso, a
+   * coluna acompanha o rótulo em vez de espremê-lo, seja qual for o nome.
    */
-  const colunas = `1.6fr 1.4fr 0.7fr ${traits.map(() => "0.9fr").join(" ")} 1.5fr`;
+  const colunas = `1.6fr 1.4fr 0.7fr ${traits
+    .map(() => "minmax(max-content, 0.9fr)")
+    .join(" ")} 1.5fr`;
   const ativos = pessoas.filter((p) => p.ativo).length;
 
   return (
@@ -380,7 +387,13 @@ export default function Pessoas() {
                 {/* Tabela — telas largas */}
                 <div className="overflow-hidden rounded-[16px] border border-stroke-frame max-[900px]:hidden">
                   <div className="overflow-x-auto">
-                    <div className="min-w-[860px]">
+                    {/*
+                      `w-max` deixa a tabela crescer até a largura que as colunas
+                      pedem, e `min-w-full` faz ela preencher o cartão quando
+                      sobra espaço — só com `w-max` ficava uma faixa vazia à
+                      direita, com o cabeçalho terminando antes da borda.
+                    */}
+                    <div className="w-max min-w-full">
                       <div
                         style={{ gridTemplateColumns: colunas }}
                         className="grid gap-3 border-b border-stroke-frame bg-surface-lower px-4 py-2.5"
@@ -389,7 +402,7 @@ export default function Pessoas() {
                           (rotulo, i) => (
                             <span
                               key={`${rotulo}-${i}`}
-                              className="text-[11px] leading-4 tracking-wide text-ink-caption uppercase"
+                              className="text-[11px] leading-4 tracking-wide whitespace-nowrap text-ink-caption uppercase"
                             >
                               {rotulo}
                             </span>
