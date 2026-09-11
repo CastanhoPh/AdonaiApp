@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mensagemDeErro } from "./erros";
 
 interface Resposta<T> {
@@ -36,6 +36,119 @@ export interface Recurso<T> {
 const cache = new Map<string, Resposta<unknown>>();
 const LIMITE = 60;
 
+/*
+ * O mesmo cache, agora também em disco.
+ *
+ * O da memória resolve a troca de aba, mas morre quando o app fecha — e é
+ * justamente abrir o app que doía: no 4G de um ginásio, a tela de Pessoas
+ * levava quase oito segundos de tela vazia. O tempo não era de banda (o
+ * JavaScript já vinha do cache do navegador), era a soma das idas e voltas
+ * até o servidor, com a pessoa olhando um esqueleto enquanto isso.
+ *
+ * Guardando a última resposta em disco, a abertura seguinte pinta na hora com
+ * o que já se sabia e a busca no servidor continua por trás, trocando o
+ * conteúdo quando chega. É o contrário do defeito antigo do `getDocsFromCache`:
+ * lá o cache era tratado como resposta final; aqui ele é só o que se mostra
+ * enquanto a resposta verdadeira não chega.
+ */
+const DISCO = "adonai:tela:";
+/** Depois disto o disco não serve mais: melhor o esqueleto que o retrato de ontem. */
+const VALIDADE = 24 * 60 * 60 * 1000;
+/** Payload maior que isto não vai para o disco; a cota do navegador é pequena. */
+const MAIOR_PAYLOAD = 400 * 1024;
+
+/*
+ * De quem é o que está guardado.
+ *
+ * O disco sobrevive ao logout, então a chave carrega o uid e a leitura só
+ * aceita entradas da conta atual. `limparCacheDeTelas` apaga tudo na troca;
+ * o uid na chave é a segunda tranca, para o caso de o app fechar no meio.
+ */
+let contaDoCache: string | null = null;
+
+export function definirContaDoCache(uid: string | null): void {
+  contaDoCache = uid;
+}
+
+function chaveNoDisco(chave: string): string {
+  return `${DISCO}${contaDoCache}|${chave}`;
+}
+
+function lerDoDisco<T>(chave: string): Resposta<T> | null {
+  if (typeof window === "undefined" || !contaDoCache) return null;
+  try {
+    const cru = window.localStorage.getItem(chaveNoDisco(chave));
+    if (!cru) return null;
+    const { em, dados } = JSON.parse(cru) as { em: number; dados: T };
+    if (!em || Date.now() - em > VALIDADE) {
+      window.localStorage.removeItem(chaveNoDisco(chave));
+      return null;
+    }
+    return { chave, dados, erro: null };
+  } catch {
+    // Entrada corrompida ou acesso negado (janela anônima): segue sem disco.
+    return null;
+  }
+}
+
+function gravarNoDisco(chave: string, dados: unknown): void {
+  if (typeof window === "undefined" || !contaDoCache) return;
+  try {
+    const texto = JSON.stringify({ em: Date.now(), dados });
+    if (texto.length > MAIOR_PAYLOAD) return;
+    window.localStorage.setItem(chaveNoDisco(chave), texto);
+  } catch {
+    // Cota estourada: larga o que é nosso e desiste desta gravação.
+    limparDisco();
+  }
+}
+
+function limparDisco(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const alvos: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k?.startsWith(DISCO)) alvos.push(k);
+    }
+    alvos.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    // Sem acesso ao armazenamento: não há o que limpar.
+  }
+}
+
+/**
+ * Descarta o que é de outra conta ou já venceu.
+ *
+ * O disco sobrevive ao fechar do app, então sem esta varredura as entradas de
+ * quem usou o aparelho antes ficariam ocupando a cota para sempre — ilegíveis,
+ * porque a chave carrega o uid, mas ocupando.
+ */
+export function limparDiscoAlheio(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const meu = `${DISCO}${contaDoCache}|`;
+    const alvos: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (!k?.startsWith(DISCO)) continue;
+      if (!k.startsWith(meu)) {
+        alvos.push(k);
+        continue;
+      }
+      try {
+        const { em } = JSON.parse(window.localStorage.getItem(k) ?? "{}") as { em?: number };
+        if (!em || Date.now() - em > VALIDADE) alvos.push(k);
+      } catch {
+        alvos.push(k);
+      }
+    }
+    alvos.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    // Sem acesso ao armazenamento: não há o que varrer.
+  }
+}
+
 function guardar(chave: string, resposta: Resposta<unknown>): void {
   // Reinsere no fim para o mais recente ficar por último e a poda cortar o mais antigo.
   cache.delete(chave);
@@ -44,6 +157,7 @@ function guardar(chave: string, resposta: Resposta<unknown>): void {
     const maisAntiga = cache.keys().next().value;
     if (maisAntiga !== undefined) cache.delete(maisAntiga);
   }
+  gravarNoDisco(chave, resposta.dados);
 }
 
 /**
@@ -52,6 +166,7 @@ function guardar(chave: string, resposta: Resposta<unknown>): void {
  */
 export function limparCacheDeTelas(): void {
   cache.clear();
+  limparDisco();
 }
 
 /**
@@ -112,10 +227,14 @@ export function useCarregar<T>(
   /*
    * Enquanto a resposta em estado for de outra chave — primeira montagem ou
    * troca de dependência —, vale o que estiver no cache para a chave atual.
+   *
+   * O disco é o último recurso e é lido uma vez por chave: `localStorage` é
+   * síncrono, e reler a cada render deixaria a rolagem pesada.
    */
   const doEstado = resposta && resposta.chave === chave ? resposta : null;
   const doCache = (cache.get(chave) as Resposta<T> | undefined) ?? null;
-  const atual = doEstado ?? doCache;
+  const doDisco = useMemo(() => lerDoDisco<T>(chave), [chave]);
+  const atual = doEstado ?? doCache ?? doDisco;
 
   return {
     dados: atual?.dados ?? null,

@@ -21,7 +21,7 @@ import {
 } from "firebase/auth";
 import { auth, firebaseConfigurado } from "./firebase";
 import { buscarConta, buscarPessoa, salvarConta } from "./db";
-import { limparCacheDeTelas } from "./hooks";
+import { definirContaDoCache, limparCacheDeTelas, limparDiscoAlheio } from "./hooks";
 import type { Person, UserAccount } from "./types";
 
 export { mensagemDeErro } from "./erros";
@@ -84,7 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [conta, setConta] = useState<UserAccount | null>(null);
   const [pessoa, setPessoa] = useState<Person | null>(null);
   // Última conta vista, para esvaziar o cache de telas quando ela muda.
-  const ultimoUid = useRef<string | null>(null);
+  /*
+   * `undefined` = ainda não observamos nenhuma sessão nesta carga da página.
+   * Antes era `null`, e aí abrir o app com sessão salva parecia troca de conta:
+   * inofensivo enquanto o cache era só de memória (que nasce vazia), mas passou
+   * a apagar o cache em disco logo na abertura — justamente o que ele existe
+   * para evitar.
+   */
+  const ultimoUid = useRef<string | null | undefined>(undefined);
 
   const carregarPerfil = useCallback(async (user: User) => {
     let registro = await buscarConta(user.uid);
@@ -112,10 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!firebaseConfigurado) return;
     return onAuthStateChanged(auth, async (user) => {
       const uid = user?.uid ?? null;
+      const primeira = ultimoUid.current === undefined;
       const trocou = ultimoUid.current !== uid;
       if (trocou) {
-        // Sair ou trocar de conta descarta o que foi carregado pela anterior.
-        limparCacheDeTelas();
+        /*
+         * Só troca de verdade apaga o que ficou guardado. Abrir o app com a
+         * sessão de sempre não é troca: ali o cache em disco é justamente o que
+         * faz a tela aparecer na hora.
+         *
+         * A ordem importa: limpa com o dono antigo ainda registrado, senão as
+         * chaves da conta que saiu ficariam para trás.
+         */
+        if (!primeira) limparCacheDeTelas();
+        definirContaDoCache(uid);
+        // Na primeira vez, varre o que sobrou de outras contas e o que venceu.
+        if (primeira) limparDiscoAlheio();
         ultimoUid.current = uid;
       }
       setUsuario(user);

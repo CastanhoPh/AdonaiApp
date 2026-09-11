@@ -486,11 +486,23 @@ export function Avatar({
   const texto = tamanho === 28 ? "text-[11px]" : tamanho === 56 ? "text-[18px]" : "text-[14px]";
   if (url) {
     return (
-      // Foto vinda do Storage ou de uma URL informada pela direção.
+      /*
+       * Foto vinda do Storage ou de uma URL informada pela direção.
+       *
+       * `lazy` e `async` porque a foto nunca é o conteúdo da tela — é enfeite
+       * ao lado do nome. Numa lista de quarenta pessoas, as de baixo estavam
+       * disputando banda com o que a direção veio ler. As dimensões vão no
+       * atributo além do estilo: com elas o navegador reserva o círculo antes
+       * de baixar, e a linha não pula quando a imagem chega.
+       */
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={url}
         alt={nome}
+        width={tamanho}
+        height={tamanho}
+        loading="lazy"
+        decoding="async"
         style={{ width: tamanho, height: tamanho }}
         className="shrink-0 rounded-full border border-stroke-frame object-cover"
       />
