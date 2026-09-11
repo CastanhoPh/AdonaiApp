@@ -11,12 +11,13 @@ import {
   listarPersonagens,
   buscarCaracteristicasAtribuidas,
   comCaracteristicas,
+  listarContas,
   listarPessoas,
   listarTodasParticipacoes,
 } from "@/lib/db";
 import { nomeCurto, normalizar, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
-import type { Character, Participation, Person, Play, Trait } from "@/lib/types";
+import type { Character, Participation, Person, Play, Trait, UserAccount } from "@/lib/types";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin } from "@/components/shell";
 import { VincularAcessos } from "@/components/admin/vincular-acessos";
 import {
@@ -42,6 +43,8 @@ interface Dados {
   peca: Play | null;
   personagens: Character[];
   participacoes: Participation[];
+  /** O papel mora na conta, não na ficha — é daqui que sai a marca "Direção". */
+  contas: UserAccount[];
 }
 
 const FILTRO_PECAS = [
@@ -73,13 +76,15 @@ export default function Pessoas() {
      * não se distingue "sem peça" de "ainda não baixei". Era uma ida ao
      * servidor garantida a cada primeira visita desta tela.
      */
-    const [pessoas, caracteristicas, pecas, participacoes, atribuidas] = await Promise.all([
-      listarPessoas(),
-      listarCaracteristicas(),
-      listarPecas(),
-      listarTodasParticipacoes(),
-      buscarCaracteristicasAtribuidas(),
-    ]);
+    const [pessoas, caracteristicas, pecas, participacoes, atribuidas, contas] =
+      await Promise.all([
+        listarPessoas(),
+        listarCaracteristicas(),
+        listarPecas(),
+        listarTodasParticipacoes(),
+        buscarCaracteristicasAtribuidas(),
+        listarContas(),
+      ]);
     const peca = pecas.find((p) => p.atual) ?? null;
     const personagens = peca ? await listarPersonagens(peca.id) : [];
     return {
@@ -89,6 +94,7 @@ export default function Pessoas() {
       peca,
       personagens,
       participacoes,
+      contas,
     };
   }, []);
 
@@ -97,13 +103,17 @@ export default function Pessoas() {
   const [filtroPersonagem, setFiltroPersonagem] = useState("todos");
   const [filtroPecas, setFiltroPecas] = useState<string>("todas");
   /*
-   * Abre mostrando ativos e inativos.
+   * Abre em "somente ativos".
    *
-   * "Ativa no grupo" passa a significar "participa e usa o app", e quem está no
-   * cadastro só pelo acervo fica inativa. Com o filtro em "somente ativos", a
-   * tela mostrava 4 de 42 pessoas e parecia que o acervo não tinha entrado.
+   * "Ativa no grupo" significa "participa e usa o app"; quem entrou só pelo
+   * acervo fica inativa, e hoje isso é a maioria do cadastro. O trabalho do dia
+   * a dia — escalar, convocar, avisar — é com quem está ativo, e essas dezenas
+   * de fichas antigas enterravam esse grupo no meio da lista.
+   *
+   * Elas não somem sem aviso: a contagem abaixo da barra de filtros diz quantas
+   * estão escondidas, e o seletor ao lado traz todas de volta.
    */
-  const [filtroSituacao, setFiltroSituacao] = useState("todos");
+  const [filtroSituacao, setFiltroSituacao] = useState("ativos");
 
   const [formAberto, setFormAberto] = useState(false);
   const [traitAberto, setTraitAberto] = useState(false);
@@ -113,6 +123,21 @@ export default function Pessoas() {
 
   const pessoas = useMemo(() => dados.dados?.pessoas ?? [], [dados.dados]);
   const traits = dados.dados?.caracteristicas ?? [];
+
+  /*
+   * Quem é da direção.
+   *
+   * O papel é da conta de acesso, não da ficha, e as duas coisas se ligam por
+   * `personId`. Sem esta lista a tela de Pessoas não tinha como mostrar quem
+   * administra o app — a informação só aparecia entrando na ficha de cada um.
+   */
+  const ehDirecao = useMemo(() => {
+    const ids = new Set<string>();
+    for (const conta of dados.dados?.contas ?? []) {
+      if (conta.role === "admin" && conta.personId) ids.add(conta.personId);
+    }
+    return ids;
+  }, [dados.dados]);
   const personagens = useMemo(() => dados.dados?.personagens ?? [], [dados.dados]);
   const participacoes = useMemo(() => dados.dados?.participacoes ?? [], [dados.dados]);
 
@@ -194,7 +219,13 @@ export default function Pessoas() {
   }
 
   // Grade da tabela: nome, personagem, peças, uma coluna por característica, situação.
-  const colunas = `1.6fr 1.4fr 0.7fr ${traits.map(() => "0.9fr").join(" ")} 0.9fr`;
+  /*
+   * A última coluna é mais larga que as outras: é a que acumula "Ativo" com
+   * "Direção" e "Sem e-mail". Em 0.9fr as etiquetas quebravam para a linha de
+   * baixo e só as linhas que as tinham ficavam mais altas, o que deixava a
+   * tabela com um passo irregular.
+   */
+  const colunas = `1.6fr 1.4fr 0.7fr ${traits.map(() => "0.9fr").join(" ")} 1.5fr`;
   const ativos = pessoas.filter((p) => p.ativo).length;
 
   return (
@@ -307,6 +338,27 @@ export default function Pessoas() {
               </div>
             </div>
 
+            {/*
+              Quantas ficaram de fora.
+              A tela abre filtrando por ativos, e sem esta linha as dezenas de
+              fichas do acervo sumiriam em silêncio — quem procurasse alguém
+              que já atuou concluiria que a pessoa não está cadastrada.
+            */}
+            {filtradas.length < pessoas.length ? (
+              <p className="text-[12px] leading-[18px] text-ink-caption">
+                Mostrando {filtradas.length} de {pessoas.length}.{" "}
+                {filtroSituacao === "ativos" ? (
+                  <button
+                    type="button"
+                    onClick={() => setFiltroSituacao("todos")}
+                    className="font-medium text-brand-strong hover:underline"
+                  >
+                    Ver também quem está inativo
+                  </button>
+                ) : null}
+              </p>
+            ) : null}
+
             {erro && !formAberto && !traitAberto ? <Aviso>{erro}</Aviso> : null}
 
             {filtradas.length === 0 ? (
@@ -381,6 +433,8 @@ export default function Pessoas() {
                               <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
                                 {pessoa.ativo ? "Ativo" : "Inativo"}
                               </Status>
+                              {/* Quem administra o app. Vem da conta, não da ficha. */}
+                              {ehDirecao.has(pessoa.id) ? <Tag tom="areia">Direção</Tag> : null}
                               {/*
                                 * Sem e-mail a pessoa nunca será encontrada
                                 * quando criar a conta. Precisa ficar à vista,
@@ -418,6 +472,7 @@ export default function Pessoas() {
                                   <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
                                     {pessoa.ativo ? "Ativo" : "Inativo"}
                                   </Status>
+                                  {ehDirecao.has(pessoa.id) ? <Tag tom="areia">Direção</Tag> : null}
                                   {!pessoa.email ? <Tag tom="aviso">Sem e-mail</Tag> : null}
                                   {marcadas.map((t) => (
                                     <Tag key={t.id} tom="info">
