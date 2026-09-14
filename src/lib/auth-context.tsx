@@ -21,7 +21,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, firebaseConfigurado } from "./firebase";
-import { buscarConta, buscarPessoa, salvarConta } from "./db";
+import { buscarConta, buscarPessoa, comContato, salvarConta } from "./db";
 import { definirContaDoCache, limparCacheDeTelas, limparDiscoAlheio } from "./hooks";
 import type { Person, UserAccount } from "./types";
 
@@ -236,7 +236,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     await alinharToken(user, registro);
-    const doCadastro = registro.personId ? await buscarPessoa(registro.personId) : null;
+    /*
+     * A ficha da própria pessoa vem com o contato junto.
+     *
+     * Telefone, nascimento e responsável saíram de `people` — que todo o elenco
+     * lê — e foram para `privado/contato`. É uma leitura a mais, e só aqui:
+     * são os dados dela, usados no Perfil e no cadastro de primeiro acesso.
+     */
+    const daFicha = registro.personId ? await buscarPessoa(registro.personId) : null;
+    const doCadastro = daFicha ? await comContato(daFicha) : null;
     setContaReal(registro);
     setPessoaReal(doCadastro);
     lembrarSessao({ uid: user.uid, conta: registro, pessoa: doCadastro });

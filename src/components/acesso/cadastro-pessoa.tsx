@@ -40,10 +40,11 @@ import {
 function doPessoa(pessoa: Person) {
   return {
     nome: pessoa.nome ?? "",
-    telefone: pessoa.telefone ?? "",
-    nascimento: pessoa.nascimento ?? "",
-    responsavelNome: pessoa.responsavelNome ?? "",
-    responsavelTelefone: pessoa.responsavelTelefone ?? "",
+    // O contato pessoal vem de `privado/contato`, fora da ficha pública.
+    telefone: pessoa.contato?.telefone ?? "",
+    nascimento: pessoa.contato?.nascimento ?? "",
+    responsavelNome: pessoa.contato?.responsavelNome ?? "",
+    responsavelTelefone: pessoa.contato?.responsavelTelefone ?? "",
     jaAtuou: pessoa.jaAtuou ?? null,
     experiencia: (pessoa.experiencia ?? "") as Experiencia | "",
     // Cadastros antigos guardavam um número aqui; só faixa conhecida entra.

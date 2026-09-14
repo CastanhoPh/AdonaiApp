@@ -107,7 +107,7 @@ export default function Perfil() {
             </p>
             <p className="mt-0.5 truncate text-[13px] leading-5 text-ink-caption">
               {pessoa.email}
-              {pessoa.telefone ? ` · ${pessoa.telefone}` : ""}
+              {pessoa.contato?.telefone ? ` · ${pessoa.contato?.telefone}` : ""}
               {desde ? ` · desde ${desde}` : ""}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -171,17 +171,17 @@ export default function Perfil() {
             <Dado
               rotulo="Idade"
               valor={
-                pessoa.nascimento && idade(pessoa.nascimento) !== null
-                  ? pluralizar(idade(pessoa.nascimento) as number, "ano", "anos")
+                pessoa.contato?.nascimento && idade(pessoa.contato?.nascimento) !== null
+                  ? pluralizar(idade(pessoa.contato?.nascimento) as number, "ano", "anos")
                   : "não informada"
               }
             />
-            {pessoa.nascimento && ehMenorDeIdade(pessoa.nascimento, MAIORIDADE) ? (
+            {pessoa.contato?.nascimento && ehMenorDeIdade(pessoa.contato?.nascimento, MAIORIDADE) ? (
               <>
-                <Dado rotulo="Responsável" valor={pessoa.responsavelNome || "não informado"} />
+                <Dado rotulo="Responsável" valor={pessoa.contato?.responsavelNome || "não informado"} />
                 <Dado
                   rotulo="Telefone dele"
-                  valor={pessoa.responsavelTelefone || "não informado"}
+                  valor={pessoa.contato?.responsavelTelefone || "não informado"}
                 />
               </>
             ) : null}

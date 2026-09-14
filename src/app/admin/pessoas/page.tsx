@@ -195,7 +195,8 @@ export default function Pessoas() {
       await criarPessoa({
         nome: form.nome.trim(),
         email: form.email.trim(),
-        telefone: form.telefone.trim(),
+        // Vai para `privado/contato`, fora da ficha que todo o elenco lê.
+        contato: { telefone: form.telefone.trim() },
         fotoUrl: "",
         ativo: form.ativo,
         caracteristicas: form.caracteristicas,

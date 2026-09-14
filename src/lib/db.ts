@@ -69,6 +69,7 @@ async function getDoc<T>(referencia: DocumentReference<T>): Promise<DocumentSnap
 import type {
   Aviso,
   Character,
+  ContatoPessoal,
   Convite,
   Exercise,
   Participation,
@@ -148,8 +149,9 @@ export async function buscarPessoa(id: string): Promise<Person | null> {
 }
 
 export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promise<string> {
-  // As características saem do documento da pessoa: veja REF_ATRIBUICOES.
-  const { caracteristicas, ...doDocumento } = dados;
+  // Duas coisas não moram no documento da pessoa: as características, que são
+  // avaliação da direção, e o contato, que o elenco inteiro não precisa ler.
+  const { caracteristicas, contato, ...doDocumento } = dados;
   const ref = doc(collection(db, "people"));
   await setDoc(ref, {
     ...doDocumento,
@@ -157,6 +159,7 @@ export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promi
     criadoEm: new Date().toISOString(),
   });
   if (caracteristicas?.length) await definirCaracteristicasDaPessoa(ref.id, caracteristicas);
+  if (contato) await salvarContato(ref.id, contato);
   return ref.id;
 }
 
@@ -166,23 +169,27 @@ export async function atualizarPessoa(id: string, dados: Partial<Person>): Promi
   // Desviada para o documento da direção, nunca para o da pessoa.
   const caracteristicas = limpo.caracteristicas;
   delete limpo.caracteristicas;
+  // Desviado para `privado/contato`, que só a direção e a própria pessoa leem.
+  const contato = limpo.contato;
+  delete limpo.contato;
+  if (contato) await salvarContato(id, contato);
   if (typeof limpo.email === "string") limpo.email = limpo.email.toLowerCase();
   if (Object.keys(limpo).length > 0) await updateDoc(doc(db, "people", id), limpo);
   if (caracteristicas) await definirCaracteristicasDaPessoa(id, caracteristicas);
 }
 
-/** Campos que a própria pessoa preenche no cadastro de primeiro acesso. */
+/**
+ * Campos que a própria pessoa preenche no cadastro de primeiro acesso.
+ *
+ * Vão para dois lugares: o que a lista de elenco mostra fica em `people`, e o
+ * contato pessoal vai para `privado/contato`. Quem chama não precisa saber
+ * disso — `completarCadastro` separa.
+ */
 export type CadastroDaPessoa = Pick<
   Person,
-  | "nome"
-  | "telefone"
-  | "nascimento"
-  | "responsavelNome"
-  | "responsavelTelefone"
-  | "jaAtuou"
-  | "experiencia"
-  | "pecasAnteriores"
->;
+  "nome" | "jaAtuou" | "experiencia" | "pecasAnteriores"
+> &
+  ContatoPessoal;
 
 /**
  * Grava as respostas do cadastro e marca a conclusão. `cadastroCompletoEm`
@@ -193,8 +200,15 @@ export async function completarCadastro(
   personId: string,
   dados: CadastroDaPessoa,
 ): Promise<void> {
+  const { telefone, nascimento, responsavelNome, responsavelTelefone, ...naFicha } = dados;
+  await salvarContato(personId, {
+    telefone,
+    nascimento,
+    responsavelNome,
+    responsavelTelefone,
+  });
   await updateDoc(doc(db, "people", personId), {
-    ...dados,
+    ...naFicha,
     cadastroCompletoEm: new Date().toISOString(),
   });
 }
@@ -354,6 +368,47 @@ export async function listarConvitesDaPessoa(personId: string): Promise<Convite[
 /** Apaga o convite. Usado para revogar um código que vazou ou se perdeu. */
 export async function revogarConvite(codigo: string): Promise<void> {
   await deleteDoc(doc(db, "convites", codigo));
+}
+
+/* ------------------------------------------------------ contato pessoal */
+
+/**
+ * Telefone, nascimento e responsável — o que só a direção e a própria pessoa
+ * enxergam.
+ *
+ * Fica fora de `people` porque aquele documento é lido por todo o elenco para
+ * montar a lista de elenco. Buscar é uma leitura a mais, então só as telas que
+ * mostram esses campos pagam: o Perfil da própria pessoa e a ficha na direção.
+ */
+function refDoContato(personId: string) {
+  return doc(db, "people", personId, "privado", "contato");
+}
+
+const SEM_CONTATO: ContatoPessoal = { telefone: "" };
+
+export async function buscarContato(personId: string): Promise<ContatoPessoal> {
+  const snap = await getDoc(refDoContato(personId));
+  if (!snap.exists()) return SEM_CONTATO;
+  const d = snap.data() as Partial<ContatoPessoal>;
+  return {
+    telefone: d.telefone ?? "",
+    nascimento: d.nascimento,
+    responsavelNome: d.responsavelNome,
+    responsavelTelefone: d.responsavelTelefone,
+  };
+}
+
+/** Grava só o que veio; o resto do documento fica como está. */
+export async function salvarContato(
+  personId: string,
+  dados: Partial<ContatoPessoal>,
+): Promise<void> {
+  await setDoc(refDoContato(personId), dados, { merge: true });
+}
+
+/** Junta a ficha com o contato, para a tela receber tudo num objeto só. */
+export async function comContato(pessoa: Person): Promise<Person> {
+  return { ...pessoa, contato: await buscarContato(pessoa.id) };
 }
 
 /* --------------------------------------------------------- características */

@@ -93,11 +93,32 @@ export type Experiencia = (typeof EXPERIENCIAS)[number];
 export const MAIORIDADE = 18;
 
 /** Integrante do teatro. Documento em `people/{personId}`. */
+/**
+ * O que é pessoal e não fica em `people`.
+ *
+ * `people` é lido por todo o elenco — a lista de elenco precisa de nome e
+ * foto —, então telefone, nascimento e o contato do responsável moravam à
+ * vista de todos. Agora ficam em `people/{id}/privado/contato`, que só a
+ * direção e a própria pessoa leem.
+ *
+ * Chega em `Person` mesclado por `comContato`, e por isso é opcional: nas
+ * listas de elenco ele nem é buscado.
+ */
+export interface ContatoPessoal {
+  telefone: string;
+  /**
+   * Data de nascimento, `AAAA-MM-DD`. Guardamos a data e não a idade: idade
+   * envelhece sozinha, e é dela que depende a exigência de responsável.
+   */
+  nascimento?: string;
+  responsavelNome?: string;
+  responsavelTelefone?: string;
+}
+
 export interface Person {
   id: string;
   nome: string;
   email: string;
-  telefone: string;
   fotoUrl: string;
   ativo: boolean;
   /**
@@ -114,15 +135,13 @@ export interface Person {
   /*
    * Respostas do cadastro de primeiro acesso. Opcionais porque os cadastros
    * criados pela direção antes do formulário não têm esses campos.
+   *
+   * O que é contato pessoal está em `ContatoPessoal`, fora deste documento.
    */
 
-  /**
-   * Data de nascimento, `AAAA-MM-DD`. Guardamos a data e não a idade: idade
-   * envelhece sozinha, e é dela que depende a exigência de responsável.
-   */
-  nascimento?: string;
-  responsavelNome?: string;
-  responsavelTelefone?: string;
+  /** Mesclado de `privado/contato` quando a tela precisa; ausente nas listas. */
+  contato?: ContatoPessoal;
+
   /** Nulo enquanto a pessoa não responde. */
   jaAtuou?: boolean | null;
   experiencia?: Experiencia | "";

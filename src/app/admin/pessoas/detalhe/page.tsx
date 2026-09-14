@@ -8,6 +8,7 @@ import {
   buscarPecaAtual,
   listarPersonagensDaPessoa,
   buscarCaracteristicasAtribuidas,
+  buscarContato,
   buscarPessoa,
   listarCaracteristicas,
   listarParticipacoes,
@@ -89,18 +90,23 @@ function ConteudoPerfil() {
         observacoes: "",
       };
     }
-    const [pessoa, peca, participacoes, caracteristicas, notas, atribuidas] = await Promise.all([
+    const [pessoa, peca, participacoes, caracteristicas, notas, atribuidas, contato] =
+      await Promise.all([
       buscarPessoa(id),
       buscarPecaAtual(),
       listarParticipacoes(id),
       listarCaracteristicas(),
       buscarObservacoes(id),
       buscarCaracteristicasAtribuidas(),
+      buscarContato(id),
     ]);
     const personagens = peca ? await listarPersonagensDaPessoa(peca.id, id) : [];
     return {
       // Mesclado aqui: o documento da pessoa não guarda mais a avaliação.
-      pessoa: pessoa ? { ...pessoa, caracteristicas: atribuidas.pessoas[id] ?? [] } : null,
+      // O contato pessoal mora fora da ficha; a direção precisa dele aqui.
+      pessoa: pessoa
+        ? { ...pessoa, caracteristicas: atribuidas.pessoas[id] ?? [], contato }
+        : null,
       peca,
       personagens,
       participacoes,
@@ -135,7 +141,7 @@ function ConteudoPerfil() {
     setForm({
       nome: pessoa.nome,
       email: pessoa.email,
-      telefone: pessoa.telefone ?? "",
+      telefone: pessoa.contato?.telefone ?? "",
       fotoUrl: pessoa.fotoUrl ?? "",
       ativo: pessoa.ativo,
       caracteristicas: pessoa.caracteristicas ?? [],
@@ -165,7 +171,7 @@ function ConteudoPerfil() {
       if (form.nome.trim() !== pessoa.nome) await renomearPessoa(id, form.nome.trim());
       await atualizarPessoa(id, {
         email: form.email.trim(),
-        telefone: form.telefone.trim(),
+        contato: { telefone: form.telefone.trim() },
         fotoUrl: form.fotoUrl.trim(),
         ativo: form.ativo,
         caracteristicas: form.caracteristicas,
@@ -261,7 +267,7 @@ function ConteudoPerfil() {
     <>
       <TopoAdmin
         titulo={nomeCurto(pessoa.nome)}
-        subtitulo={[pessoa.email, pessoa.telefone, desde ? `desde ${desde}` : null]
+        subtitulo={[pessoa.email, pessoa.contato?.telefone, desde ? `desde ${desde}` : null]
           .filter(Boolean)
           .join(" · ")}
         acoes={
@@ -467,22 +473,22 @@ function ConteudoPerfil() {
                 <Dado
                   rotulo="Nascimento"
                   valor={
-                    pessoa.nascimento
-                      ? `${dataLonga(pessoa.nascimento)}${
-                          idade(pessoa.nascimento) !== null
-                            ? ` · ${pluralizar(idade(pessoa.nascimento) as number, "ano", "anos")}`
+                    pessoa.contato?.nascimento
+                      ? `${dataLonga(pessoa.contato?.nascimento)}${
+                          idade(pessoa.contato?.nascimento) !== null
+                            ? ` · ${pluralizar(idade(pessoa.contato?.nascimento) as number, "ano", "anos")}`
                             : ""
                         }`
                       : "não informado"
                   }
                 />
-                {pessoa.nascimento && ehMenorDeIdade(pessoa.nascimento, MAIORIDADE) ? (
+                {pessoa.contato?.nascimento && ehMenorDeIdade(pessoa.contato?.nascimento, MAIORIDADE) ? (
                   <Dado
                     rotulo="Responsável"
                     valor={
-                      pessoa.responsavelNome
-                        ? `${pessoa.responsavelNome}${
-                            pessoa.responsavelTelefone ? ` · ${pessoa.responsavelTelefone}` : ""
+                      pessoa.contato?.responsavelNome
+                        ? `${pessoa.contato?.responsavelNome}${
+                            pessoa.contato?.responsavelTelefone ? ` · ${pessoa.contato?.responsavelTelefone}` : ""
                           }`
                         : "não informado"
                     }
