@@ -122,7 +122,9 @@ function ConteudoPecas() {
         titulo: form.titulo.trim(),
         nomeEvento: form.nomeEvento.trim(),
         descricao: form.descricao.trim(),
+        // A capa entra depois, na aba Dados da peça.
         capaUrl: "",
+        capaMiniUrl: "",
         dataApresentacao: form.dataApresentacao,
         local: form.local.trim(),
         status: form.status,
@@ -256,8 +258,14 @@ function CartaoDeProducao({
           {peca.capaUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={peca.capaUrl}
+              // A pequena quando existe. As peças com capa antiga não têm, e
+              // aí cai na grande — que é pesada, mas melhor que quadrado vazio.
+              src={peca.capaMiniUrl || peca.capaUrl}
               alt={peca.titulo}
+              width={64}
+              height={64}
+              loading="lazy"
+              decoding="async"
               className="size-16 shrink-0 rounded-[8px] border border-stroke-frame object-cover"
             />
           ) : null}

@@ -4,10 +4,10 @@ import Link from "next/link";
 import { ArrowUpRight, Plus } from "@phosphor-icons/react";
 import {
   buscarPecaAtual,
+  contarFalas,
+  contarPessoas,
   listarEnsaios,
-  listarFalas,
   listarPersonagens,
-  listarPessoas,
 } from "@/lib/db";
 import { dataLonga, diaDoMes, diaSemana, faixaHoraria, hojeISO, mesCurto } from "@/lib/format";
 import { useCarregar } from "@/lib/hooks";
@@ -42,18 +42,27 @@ interface Resumo {
 }
 
 export default function Painel() {
+  /*
+   * O painel mostra números e duas listas curtas, e nada mais.
+   *
+   * Por isso só o que vira lista na tela vem como documento: os personagens,
+   * porque a tela nomeia os que estão sem ator, e os ensaios, porque ela abre
+   * o próximo. Pessoas e falas viram contagem no servidor — o painel escrevia
+   * "42" depois de baixar as 42 fichas, e escrevia o tamanho do roteiro depois
+   * de baixar o roteiro.
+   */
   const resumo = useCarregar<Resumo>("admin-painel", async () => {
-    const [peca, pessoas] = await Promise.all([buscarPecaAtual(), listarPessoas()]);
+    const [peca, pessoas] = await Promise.all([buscarPecaAtual(), contarPessoas()]);
     const [personagens, ensaios, falas] = peca
-      ? await Promise.all([listarPersonagens(peca.id), listarEnsaios(peca.id), listarFalas(peca.id)])
-      : [[], [], []];
+      ? await Promise.all([listarPersonagens(peca.id), listarEnsaios(peca.id), contarFalas(peca.id)])
+      : [[], [], 0];
     return {
       peca,
       personagens,
       ensaios,
-      falas: falas.length,
-      pessoasAtivas: pessoas.filter((p) => p.ativo).length,
-      pessoasInativas: pessoas.filter((p) => !p.ativo).length,
+      falas,
+      pessoasAtivas: pessoas.ativas,
+      pessoasInativas: pessoas.inativas,
     };
   }, []);
 

@@ -219,6 +219,13 @@ export interface Play {
   descricao: string;
   capaUrl: string;
   /**
+   * A capa em tamanho pequeno, para o quadrado da lista de peças.
+   *
+   * Ausente nas peças cuja capa subiu antes de isto existir; quem mostra cai
+   * na `capaUrl` nesse caso.
+   */
+  capaMiniUrl?: string;
+  /**
    * Evento em que a peça foi apresentada, quando houve um: "Natal 2024",
    * "Congresso de Jovens". Opcional porque muita peça é avulsa, e é o que dá
    * contexto no histórico anos depois — "Rede Mil" diz menos que

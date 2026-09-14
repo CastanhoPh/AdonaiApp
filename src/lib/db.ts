@@ -8,6 +8,7 @@ import {
   deleteDoc,
   deleteField,
   doc,
+  getCountFromServer,
   getDoc as getDocDoSdk,
   getDocFromCache,
   getDocs as getDocsDoSdk,
@@ -66,6 +67,25 @@ async function getDoc<T>(referencia: DocumentReference<T>): Promise<DocumentSnap
   }
   return getDocDoSdk(referencia);
 }
+
+/*
+ * Quantos são, sem trazer quais são.
+ *
+ * O Firestore responde o número no servidor: a resposta é o número, não os
+ * documentos. Para uma tela que só mostra o total — o painel da direção mostra
+ * quantas falas o roteiro tem — é a diferença entre baixar o roteiro inteiro e
+ * baixar um inteiro. Também conta como uma leitura a cada mil documentos na
+ * fatura, em vez de uma por documento.
+ *
+ * Vai sempre ao servidor, não tem versão de cache, e é por isso que só serve
+ * para número solto: onde a tela precisa dos documentos, `getDocs` continua
+ * sendo o caminho.
+ */
+async function contar(consulta: Parameters<typeof getCountFromServer>[0]): Promise<number> {
+  const resposta = await getCountFromServer(consulta);
+  return resposta.data().count;
+}
+
 import type {
   Aviso,
   Character,
@@ -141,6 +161,22 @@ export async function vincularContaAPessoa(
 export async function listarPessoas(): Promise<Person[]> {
   const snap = await getDocs(query(collection(db, "people"), orderBy("nome")));
   return snap.docs.map((d) => comId<Person>(d));
+}
+
+/**
+ * Quantas pessoas há, ativas e inativas, sem trazer a lista.
+ *
+ * Inativas sai por subtração porque `ativo` falta em ficha antiga, e consulta
+ * por `ativo == false` deixaria essas de fora — o que a tela quer dizer é
+ * "todas as que não estão ativas".
+ */
+export async function contarPessoas(): Promise<{ ativas: number; inativas: number }> {
+  const pessoas = collection(db, "people");
+  const [total, ativas] = await Promise.all([
+    contar(query(pessoas)),
+    contar(query(pessoas, where("ativo", "==", true))),
+  ]);
+  return { ativas, inativas: total - ativas };
 }
 
 export async function buscarPessoa(id: string): Promise<Person | null> {
@@ -730,6 +766,7 @@ export async function registrarPecaAntiga(dados: {
     nomeEvento: dados.nomeEvento,
     descricao: dados.descricao,
     capaUrl: "",
+    capaMiniUrl: "",
     dataApresentacao: dados.dataApresentacao,
     local: dados.local,
     status: "concluida",
@@ -901,6 +938,18 @@ export async function listarFalas(playId: string): Promise<ScriptLine[]> {
     .sort((a, b) => a.ato - b.ato || a.cena - b.cena || a.ordem - b.ordem);
 }
 
+
+/**
+ * Quantas falas o roteiro tem, sem trazer o roteiro.
+ *
+ * O painel da direção mostra esse número e mais nada do roteiro. Enquanto a
+ * peça atual está sem falas cadastradas dá no mesmo; num roteiro de verdade,
+ * com centenas de falas, abrir o painel baixava o texto inteiro para escrever
+ * um número na tela.
+ */
+export async function contarFalas(playId: string): Promise<number> {
+  return contar(query(collection(db, "plays", playId, "lines")));
+}
 
 export async function criarFala(
   playId: string,

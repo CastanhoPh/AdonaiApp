@@ -4,7 +4,12 @@ import { useState } from "react";
 import { atualizarPeca, concluirPeca, definirPecaAtual } from "@/lib/db";
 import { dataLonga, hojeISO, pluralizar } from "@/lib/format";
 import { useEnvio } from "@/lib/hooks";
-import { LADO_CENA, caminhoDaCapaDaPeca } from "@/lib/armazenamento";
+import {
+  LADO_CENA,
+  LADO_MINIATURA_CAPA,
+  caminhoDaCapaDaPeca,
+  caminhoDaMiniaturaDaCapa,
+} from "@/lib/armazenamento";
 import { PLAY_STATUS, PLAY_STATUS_LABEL, type Play, type PlayStatus } from "@/lib/types";
 import {
   Caixa,
@@ -37,6 +42,7 @@ export function AbaDados({
     nomeEvento: peca.nomeEvento ?? "",
     descricao: peca.descricao ?? "",
     capaUrl: peca.capaUrl ?? "",
+    capaMiniUrl: peca.capaMiniUrl ?? "",
     elencoFechado: peca.elencoFechado ?? false,
     dataApresentacao: peca.dataApresentacao ?? "",
     local: peca.local ?? "",
@@ -45,10 +51,10 @@ export function AbaDados({
   const [salvo, setSalvo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
-  async function salvarCapa(url: string) {
-    setForm({ ...form, capaUrl: url });
+  async function salvarCapa(url: string, miniUrl = "") {
+    setForm({ ...form, capaUrl: url, capaMiniUrl: miniUrl });
     await enviar(async () => {
-      await atualizarPeca(peca.id, { capaUrl: url });
+      await atualizarPeca(peca.id, { capaUrl: url, capaMiniUrl: miniUrl });
       await onAtualizar();
     });
   }
@@ -63,7 +69,10 @@ export function AbaDados({
       titulo: form.titulo.trim(),
       nomeEvento: form.nomeEvento.trim(),
       descricao: form.descricao.trim(),
+      // As duas sempre juntas: capa sem miniatura, ou o contrário, faria a
+      // lista mostrar uma peça e baixar a imagem de outra situação.
       capaUrl: form.capaUrl.trim(),
+      capaMiniUrl: form.capaMiniUrl.trim(),
       elencoFechado: form.elencoFechado,
       dataApresentacao: form.dataApresentacao,
       local: form.local.trim(),
@@ -177,13 +186,17 @@ export function AbaDados({
             {/* Grava na hora: o arquivo já subiu, ver aba-personagens. */}
             <EnviarFoto
               caminho={caminhoDaCapaDaPeca(peca.id, peca.titulo)}
+              miniatura={{
+                caminho: caminhoDaMiniaturaDaCapa(peca.id, peca.titulo),
+                lado: LADO_MINIATURA_CAPA,
+              }}
               // Só a capa fica solta nesta pasta; as dos personagens ficam nas de dentro.
               pasta={`pecas/${peca.id}/`}
               atual={form.capaUrl}
               ladoMaximo={LADO_CENA}
               formato="retangulo"
               rotulo="Escolher capa"
-              onEnviada={(url) => salvarCapa(url)}
+              onEnviada={(url, miniUrl) => salvarCapa(url, miniUrl)}
               onRemovida={() => salvarCapa("")}
               desabilitado={enviando}
             />

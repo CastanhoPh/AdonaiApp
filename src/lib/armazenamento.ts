@@ -5,17 +5,23 @@
  *
  * Organização dos arquivos:
  *
- *   atores/{personId}/perfil.jpg
- *   pecas/{playId}/capa.jpg
- *   pecas/{playId}/{characterId}/foto.jpg
+ *   atores/{personId}/{nome}.jpg          e {nome}-mini.jpg
+ *   pecas/{playId}/{titulo}.jpg           e {titulo}-mini.jpg
+ *   pecas/{playId}/{characterId}/{nome}.jpg
  *
  * O Storage não tem pasta de verdade — o caminho é só o nome do arquivo, e a
  * barra é o que o console mostra como hierarquia. Então "criar a pasta de um
  * ator" é enviar o primeiro arquivo dentro dela; não existe pasta vazia.
  *
- * Os nomes são fixos, não sorteados. Trocar a foto sobrescreve a anterior em
- * vez de deixar um arquivo órfão cobrando armazenamento para sempre, e o
- * caminho de qualquer foto é dedutível a partir do id.
+ * A pasta é o id e o arquivo leva o nome. O id sustenta a permissão e não pode
+ * mudar; o nome é rótulo, para quem abre o Storage reconhecer o que está
+ * vendo. Como o nome muda quando alguém é renomeado, cada pasta guarda a
+ * imagem de uma coisa só e é esvaziada antes de um envio novo — ver
+ * `limparPasta`.
+ *
+ * Toda imagem que aparece pequena em alguma lista sobe duas vezes, grande e
+ * miniatura, na mesma escolha de arquivo. Gerar a pequena depois obrigaria a
+ * baixar a grande de volta.
  *
  * Tudo é reconvertido para JPEG antes de subir, por isso a extensão é sempre a
  * mesma. Foto de celular tem 3 a 6 MB e o elenco abre o app no 4G do ensaio:
@@ -74,6 +80,17 @@ export function caminhoDaCapaDaPeca(playId: string, titulo: string): string {
   return `pecas/${playId}/${paraNomeDeArquivo(titulo, "capa")}.jpg`;
 }
 
+/**
+ * A mesma capa, pequena, para a lista de peças.
+ *
+ * A capa sobe com 1600 de lado porque um dia vai aparecer grande. Quem a
+ * mostra hoje é o quadrado de 64 pixels da lista da direção, e eram 75 kB por
+ * peça para desenhar isso — a tela inteira baixava meio megabyte de imagem.
+ */
+export function caminhoDaMiniaturaDaCapa(playId: string, titulo: string): string {
+  return `pecas/${playId}/${paraNomeDeArquivo(titulo, "capa")}-mini.jpg`;
+}
+
 export function caminhoDaFotoDoPersonagem(
   playId: string,
   characterId: string,
@@ -110,6 +127,8 @@ export const LADO_CENA = 1600;
  * densidade, que é todo celular, e ainda cabe em poucos kB.
  */
 export const LADO_MINIATURA = 128;
+/* 192 pela mesma conta, para o quadrado de 64 da lista de peças. */
+export const LADO_MINIATURA_CAPA = 192;
 
 const TAMANHO_MAXIMO = 12 * 1024 * 1024;
 

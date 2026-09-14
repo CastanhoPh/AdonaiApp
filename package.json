@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "admin": "node scripts/admin.mjs",
     "participante": "node scripts/participante.mjs",
+    "convite": "node scripts/convite.mjs",
     "seed": "node scripts/seed.mjs",
     "avisos": "node scripts/enviar-avisos.mjs",
     "segmentos": "node scripts/corrigir-segmentos.mjs",
@@ -22,7 +23,8 @@
     "corrigir-acervo": "node scripts/corrigir-acervo.mjs",
     "acervo": "node scripts/subir-acervo.mjs",
     "inativar": "node scripts/inativar-sem-acesso.mjs",
-    "corrigir-papeis": "node scripts/corrigir-papeis.mjs"
+    "corrigir-papeis": "node scripts/corrigir-papeis.mjs",
+    "miniaturas": "node scripts/gerar-miniaturas.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

@@ -5,9 +5,11 @@ personagens, elenco, roteiro e ensaios em um só lugar. A interface é pensada
 primeiro para o celular.
 
 - **Participante** — vê seu personagem, lê o roteiro com as próprias falas
-  destacadas, consulta os ensaios e o histórico de peças.
-- **Direção (administrador)** — cadastra pessoas e características, cria peças e
-  personagens, monta o elenco, escreve e publica o roteiro, marca os ensaios.
+  destacadas, consulta os ensaios, faz os exercícios de teatro que a direção
+  indica e consulta o histórico de peças.
+- **Direção (administrador)** — cadastra pessoas e características, convida
+  quem ainda não tem acesso, cria peças e personagens, monta o elenco, escreve
+  e publica o roteiro, marca os ensaios, manda avisos e cadastra os exercícios.
 
 ## Tecnologias
 
@@ -19,10 +21,15 @@ primeiro para o celular.
 | Ícones        | Phosphor Icons, peso regular                     |
 | Autenticação  | Firebase Authentication (e-mail e senha)         |
 | Banco         | Cloud Firestore                                  |
-| Arquivos      | Firebase Storage (regras prontas)                |
+| Arquivos      | Firebase Storage                                 |
+| Servidor      | Cloud Functions v2 (avisos, lembretes, convites, claims) |
 
-Todo o acesso ao banco acontece no navegador, pelo SDK do Firebase, com as
-permissões garantidas pelas regras em [`firebase/firestore.rules`](firebase/firestore.rules).
+Quase todo o acesso ao banco acontece no navegador, pelo SDK do Firebase, com
+as permissões garantidas pelas regras em
+[`firebase/firestore.rules`](firebase/firestore.rules) e
+[`firebase/storage.rules`](firebase/storage.rules). O que fica no servidor é o
+que o navegador não pode fazer sem abrir uma brecha — ver
+[Cloud Functions](#cloud-functions).
 
 ## Sistema visual
 
@@ -56,12 +63,13 @@ em [`.firebaserc`](.firebaserc):
 - Authentication com e-mail e senha — ativo
 - Cloud Firestore `(default)` em modo nativo — ativo, com as regras de
   [`firebase/firestore.rules`](firebase/firestore.rules) publicadas
+- Storage — ativo, com as regras de
+  [`firebase/storage.rules`](firebase/storage.rules) publicadas
+- Cloud Functions — plano Blaze, funções de
+  [`functions/`](functions/) publicadas em `southamerica-east1`
 - Hosting — site `adonaiapp` servindo a exportação estática
-- Características iniciais cadastradas, duas contas de administração e uma de
-  participante criadas
-
-Os nomes das duas contas de administração ficaram com um valor provisório (a
-parte antes do @). Ajuste-os na tela **Pessoas**.
+- O acervo do grupo está carregado: as peças anteriores, o elenco de cada uma e
+  o histórico de participações. O restante do grupo entra por convite.
 
 O `.env.local` com as chaves do app web fica fora do controle de versão. Para
 recriá-lo em outra máquina:
@@ -83,7 +91,7 @@ Os passos abaixo servem para recriar o ambiente em outro projeto Firebase.
 2. **Authentication › Sign-in method** → habilite **E-mail/senha**.
 3. **Firestore Database** → criar banco (modo de produção, região mais próxima,
    por exemplo `southamerica-east1`).
-4. **Storage** → criar (opcional, só se for enviar fotos pelo Firebase).
+4. **Storage** → criar. É onde ficam as fotos de perfil e as capas.
 5. **Configurações do projeto › Seus aplicativos** → adicione um app **Web** e
    copie as chaves.
 
@@ -107,6 +115,14 @@ npm install -g firebase-tools
 firebase login
 firebase use --add                 # escolha o projeto criado
 firebase deploy --only firestore:rules,storage
+```
+
+As Cloud Functions vão junto, se o projeto estiver no plano Blaze — sem elas o
+convite não é resgatado e os avisos não saem:
+
+```bash
+cd functions && npm install && cd ..
+firebase deploy --only functions
 ```
 
 ### 4. Criar um administrador
@@ -157,10 +173,19 @@ tem lista fixa.
 
 ## Instalação na tela de início (PWA)
 
-O app é instalável: [`public/manifest.webmanifest`](public/manifest.webmanifest) e um
-service worker mínimo em [`public/sw.js`](public/sw.js), que existe só para o
-navegador oferecer a instalação — ele não guarda cache, porque leitura offline
-do roteiro está nas evoluções e exige versionamento próprio.
+O app é instalável: [`public/manifest.webmanifest`](public/manifest.webmanifest) e o
+service worker de [`public/sw.js`](public/sw.js), que faz três coisas — guarda a
+casca do aplicativo, existe (o Chrome só oferece a instalação para quem tem um
+manipulador de `fetch`) e recebe os push.
+
+**O que ele guarda é o programa, nunca o dado.** HTML e JavaScript ficam no
+cache; Firestore, Storage e as capas do YouTube são de outra origem e passam
+direto para a rede, sempre. Roteiro desatualizado no ensaio seria pior que app
+que não abre. As telas do elenco entram já na instalação, não na primeira
+visita — quem instala costuma abrir só o Início, e sem isso as outras abas
+falhariam no primeiro ensaio sem sinal. Os arquivos de `/_next/static` têm o
+hash do conteúdo no nome, então respondem do cache sem perguntar à rede; o HTML
+vai à rede primeiro e só cai no cache quando ela não responde.
 
 São dois guias, escolhidos em `Guias`, dentro de
 [`src/components/shell.tsx`](src/components/shell.tsx):
@@ -187,10 +212,8 @@ com o controle compartilhado
 o tutorial usa, para as duas telas não divergirem no tratamento de
 concedido/bloqueado/indisponível.
 
-**Os avisos ainda não são enviados.** A permissão é pedida e fica registrada no
-navegador, mas falta o lado do envio: Firebase Cloud Messaging com chave VAPID e
-um disparador (Cloud Functions, que pede plano Blaze). Até isso existir, os
-ensaios são consultados na aba Ensaios.
+Os avisos são entregues de fato — ver [Avisos por notificação](#avisos-por-notificação).
+Quem não autoriza a permissão continua vendo tudo pela aba Ensaios.
 
 ### Zoom
 
@@ -227,14 +250,94 @@ listas. O cadastro completo continua em `people.nome` e é o que a direção edi
 
 ## Como o acesso dos participantes funciona
 
+Dois caminhos. O **convite** é o normal; o e-mail é o de trás.
+
+### Por convite (recomendado)
+
+1. Na ficha da pessoa, em **Pessoas**, a direção gera o convite. Sai um código
+   de 8 caracteres, um link e um QR — o que for mais prático de mandar.
+2. A pessoa abre o link (ou digita o código, ou lê o QR em `/convite`),
+   confirma que o nome é o dela e escolhe e-mail e senha.
+3. A conta nasce já ligada àquela ficha.
+
+O código vale 7 dias e serve uma vez. As duas etapas são separadas de propósito:
+confirmar o nome antes de pedir e-mail e senha evita o pior caso da tela, que é
+preencher tudo e só no fim descobrir que usou o código de outra pessoa.
+
+A leitura do QR usa o `BarcodeDetector` quando o navegador tem, e cai no
+[jsQR](https://github.com/cozmo/jsQR) quando não — o Chrome do Windows e o
+Safari do iOS não têm.
+
+Pelo terminal, quando é mais rápido mandar vários de uma vez:
+
+```bash
+npm run convite -- "Sarah Thomazi"
+npm run convite -- "Sarah Thomazi" --novo   # ignora convite em aberto
+```
+
+### Pelo e-mail
+
 1. A direção cadastra a pessoa em **Pessoas**, informando o **e-mail**.
 2. A pessoa cria a conta em `/cadastro` usando **esse mesmo e-mail**.
-3. O vínculo é automático: a conta passa a ver o personagem, o roteiro e os
-   ensaios dela.
+3. O vínculo é automático.
 
 Se a pessoa se cadastrar antes de a direção registrá-la, o aplicativo mostra
 "Aguardando o cadastro da direção" e faz o vínculo sozinho no próximo acesso,
-assim que o cadastro existir.
+assim que o cadastro existir. É o caminho que sobra quando o convite venceu ou
+quando a pessoa já criou a conta por conta própria.
+
+## Exercícios de teatro
+
+A direção cadastra em `/admin/exercicios` o nome do exercício, o objetivo e um
+link do YouTube, e ordena a lista na ordem em que quer que sejam feitos. O
+elenco vê a mesma lista em `/exercicios` e toca para abrir o vídeo.
+
+O vídeo abre **no YouTube**, não embutido. Embutir custaria o `iframe` do
+player em toda a lista, e o aplicativo do YouTube já está instalado no celular
+de quem vai assistir. [`src/lib/youtube.ts`](src/lib/youtube.ts) extrai o id do
+endereço — aceita `youtube.com/watch`, `youtu.be` e `/shorts/` — e monta a capa
+a partir dele, que é a única coisa que a lista baixa do YouTube.
+
+## Acervo: peças que já aconteceram
+
+O caminho normal de uma peça — planejamento, escalação, ensaios, conclusão —
+existe para acompanhar uma produção em andamento. Para peça antiga ele é só
+trabalho: ninguém vai ensaiar o que já foi apresentado, e o que interessa é que
+a participação de cada um entre no histórico.
+
+Por isso **Peças › Cadastrar peça antiga** é um formulário só, e a peça nasce
+concluída, com as participações gravadas de uma vez. Roteiro não é pedido: peça
+antiga raramente tem o texto à mão, e exigi-lo impediria de registrar o que se
+lembra.
+
+O acervo inicial do grupo entrou por script, que faz o mesmo em lote:
+
+```bash
+npm run acervo           # confere
+npm run acervo -- --aplicar
+```
+
+Um lote por peça, e idempotente: peça que já tem personagem não recebe elenco
+de novo. Elenco pela metade no histórico é pior que elenco nenhum, porque
+ninguém percebe o que ficou faltando.
+
+## O que é pessoal não fica na ficha
+
+`people` é lido por todo o elenco — a lista de elenco precisa de nome e foto.
+Então **telefone, data de nascimento e o contato do responsável não moram
+ali**: ficam em `people/{id}/privado/contato`, que só a direção e a própria
+pessoa leem. Antes disso, o telefone do responsável de uma menor de idade
+estava à vista de qualquer um com conta.
+
+O que sobrou na ficha pública é o que a lista de elenco mostra de fato: nome,
+foto, situação no grupo, experiência e as peças anteriores. As regras do
+Firestore listam esses campos um a um, e a lista é o que a própria pessoa pode
+escrever — situação no grupo e características de atuação continuam fechadas,
+porque são decisão do grupo e avaliação da direção.
+
+As observações internas da direção ficam em `people/{id}/privado/direcao`, e as
+características de atuação em `direcao/caracteristicas` — as duas fora do
+alcance de quem é participante.
 
 ## Estrutura
 
@@ -242,37 +345,54 @@ assim que o cadastro existir.
 src/
   app/                             rotas (App Router)
     page.tsx                       encaminha para a área certa
-    login/ cadastro/               acesso
+    login/ cadastro/               acesso por e-mail e senha
+    convite/                       primeiro acesso por código, link ou QR
     opengraph-image.tsx            prévia de compartilhamento, gerada no build
-    (participante)/                início, personagem, roteiro, ensaios, histórico, perfil
-                                   (tab bar: Início · Roteiro · Ensaios · Perfil)
-    admin/                         painel, pessoas, peças, ensaios
-      pecas/detalhe                uma peça (?id=), abas de dados/personagens/elenco
-      pecas/roteiro                editor de roteiro (?id=)
+    (participante)/                início, personagem, roteiro, ensaios,
+                                   exercícios, histórico, perfil
+                                   (tab bar: Exercícios · Roteiro · Início · Ensaios · Perfil)
+    admin/                         painel, pessoas, peças, ensaios, exercícios, avisos
+      pecas/detalhe                uma peça (?id=), abas de dados/personagens/elenco/roteiro
+      pecas/antiga                 cadastro de peça que já aconteceu
+      pecas/roteiro                endereço antigo, encaminha para a aba
       pessoas/detalhe              perfil administrativo (?id=)
   components/
     ui.tsx                         primitivos do design system
     shell.tsx                      proteção de rota e as duas navegações
     registro-sw.tsx                registra o service worker na carga
-    acesso/                        moldura de login e tutorial de primeiro acesso
-    comum/                         cartões usados nas duas áreas
-    admin/                         abas da tela de peça
+    acesso/                        moldura de login, tutorial, tour, leitor de QR
+    comum/                         cartões e controles usados nas duas áreas
+    admin/                         abas da tela de peça e o convite da pessoa
   lib/
     types.ts                       modelo de dados
     db.ts                          acesso ao Firestore e regras de negócio
     auth-context.tsx               sessão, cadastro e vínculo com a pessoa
+    armazenamento.ts               envio de imagem, caminhos e miniaturas
+    convite.ts  funcoes.ts         código do convite e chamada das functions
+    youtube.ts                     id e capa a partir do endereço
     instalacao.ts                  instalação como app e permissões
     hooks.ts  format.ts  erros.ts  firebase.ts  uso-atual.ts
+functions/                         Cloud Functions (avisos, lembrete, convite, claims)
 firebase/                          firestore.rules, storage.rules, índices
 firebase.json  .firebaserc         configuração do CLI (precisam ficar na raiz)
 scripts/
+  firebase-admin-app.mjs           credenciais dos scripts
   provisionar-conta.mjs            criação de conta + cadastro + vínculo
   admin.mjs  participante.mjs      papéis, chamando o módulo acima
+  convite.mjs                      gera o convite de alguém do cadastro
   seed.mjs                         características iniciais
-  firebase-admin-app.mjs           credenciais dos scripts
+  subir-acervo.mjs                 peças antigas, elenco e direção, em lote
+  enviar-avisos.mjs                entrega manual dos avisos pendentes
+  gerar-miniaturas.mjs             versão pequena das imagens que já estão lá
+  corrigir-segmentos.mjs           roda no build, ver Publicação
 design/                            handoff de design (HANDOFF.md + tokens)
 public/                            marca do Aliança, ícones, manifesto, sw.js
 ```
+
+Os demais scripts são de manutenção pontual — migração de dado, correção de
+cadastro, renomeação de arquivo no Storage. Cada um explica no próprio
+cabeçalho o que faz e quando foi preciso, e todos conferem antes de gravar:
+sem `--aplicar` eles só mostram o que fariam.
 
 A chave da conta de serviço **não** fica no projeto: o caminho dela é apontado
 por `GOOGLE_APPLICATION_CREDENTIALS` no `.env.local`. Guarde o arquivo fora de
@@ -280,20 +400,32 @@ pasta sincronizada — esta aqui está no OneDrive.
 
 ## Modelo de dados (Firestore)
 
-| Coleção                        | Conteúdo                                            |
-| ------------------------------ | --------------------------------------------------- |
-| `users/{uid}`                  | conta de acesso: perfil e vínculo com a pessoa      |
-| `people/{id}`                  | integrante: dados, foto, características, situação  |
-| `people/{id}/privado/direcao`  | observações internas — **só a direção lê**          |
-| `traits/{id}`                  | características de atuação (lista extensível)       |
-| `plays/{id}`                   | peça: título, capa, datas, status, peça atual       |
-| `plays/{id}/characters/{id}`   | personagem e pessoa escalada                        |
-| `plays/{id}/lines/{id}`        | linha do roteiro: ato, cena, tipo, personagem, texto |
-| `rehearsals/{id}`              | ensaio: data, horário, local, convocados, status    |
-| `participations/{id}`          | histórico, criado quando a peça é concluída         |
+| Coleção                             | Conteúdo                                       | Quem lê |
+| ----------------------------------- | ---------------------------------------------- | ------- |
+| `users/{uid}`                        | conta de acesso: papel e vínculo com a pessoa  | a própria conta e a direção |
+| `people/{id}`                        | integrante: nome, foto, situação, experiência  | todo o elenco |
+| `people/{id}/privado/contato`        | telefone, nascimento, responsável              | a própria pessoa e a direção |
+| `people/{id}/privado/direcao`        | observações internas                           | só a direção |
+| `direcao/caracteristicas`            | características atribuídas a pessoas e papéis  | só a direção |
+| `traits/{id}`                        | características de atuação (lista extensível)  | todo o elenco |
+| `plays/{id}`                         | peça: título, capa, datas, status, peça atual  | todo o elenco |
+| `plays/{id}/characters/{id}`         | personagem e pessoa escalada                   | todo o elenco |
+| `plays/{id}/lines/{id}`              | linha do roteiro: ato, cena, tipo, personagem, texto | todo o elenco |
+| `rehearsals/{id}`                    | ensaio: data, horário, local, convocados, status | todo o elenco |
+| `rehearsals/{id}/presencas/{personId}` | confirmação de presença, uma por pessoa      | todo o elenco |
+| `participations/{id}`                | histórico, criado quando a peça é concluída    | todo o elenco |
+| `exercicios/{id}`                    | exercício de teatro: nome, objetivo, link, ordem | todo o elenco |
+| `avisos/{id}`                        | aviso composto pela direção e o resultado da entrega | só a direção |
+| `convites/{codigo}`                  | convite de primeiro acesso, ligado a uma ficha | **ninguém pelo cliente** — só a direção escreve, e a função lê |
 
 Datas de ensaio e apresentação são guardadas como texto `AAAA-MM-DD`, o que
 evita erros de fuso horário e mantém a ordenação simples.
+
+Imagens que aparecem pequenas em alguma lista existem em duas versões —
+`fotoUrl`/`fotoMiniUrl` na pessoa, `capaUrl`/`capaMiniUrl` na peça. A pasta no
+Storage é o id e o arquivo leva o nome de quem é a imagem; o id sustenta a
+permissão e não pode mudar, o nome é rótulo. Ver
+[`src/lib/armazenamento.ts`](src/lib/armazenamento.ts).
 
 ## Regras de negócio implementadas
 
@@ -308,9 +440,16 @@ evita erros de fuso horário e mantém a ordenação simples.
   participante conectado.
 - O roteiro só aparece para o elenco depois de **publicado**; publicar de novo
   gera uma nova versão.
-- Observações internas da direção ficam em subcoleção separada, inacessível ao
-  participante pelas regras do Firestore.
+- Observações internas da direção, características de atuação e contato pessoal
+  ficam fora da ficha que o elenco lê, cada um em seu lugar e fechado pelas
+  regras do Firestore.
 - Pessoa desativada continua no histórico das peças anteriores.
+- **Um convite serve uma vez e vale 7 dias**, e já vem ligado a uma ficha. Duas
+  fichas nunca acabam com a mesma conta, porque quem resgata não escolhe a
+  ficha — o código escolhe.
+- Renomear alguém propaga o nome para onde ele aparece copiado: os personagens
+  que a pessoa fez e o nome na conta. O mesmo vale para a peça — mudar título,
+  evento, capa ou data atualiza as participações do histórico.
 - A confirmação de presença é respondida pela própria pessoa: o documento fica
   em `rehearsals/{id}/presencas/{personId}`, com o id da pessoa, então ninguém
   sobrescreve a resposta de outro. A direção pode corrigir qualquer uma.
@@ -347,6 +486,10 @@ que depende a exigência de responsável: quem cadastrasse 17 continuaria 17 par
 sempre e o app deixaria de pedir o contato do responsável no momento certo. A
 idade é calculada na hora de exibir.
 
+As respostas vão para dois lugares: o que a lista de elenco mostra fica na
+ficha, e telefone, nascimento e responsável vão para `privado/contato` — ver
+[O que é pessoal não fica na ficha](#o-que-é-pessoal-não-fica-na-ficha).
+
 O mesmo formulário é reaproveitado em **Perfil › Editar meus dados**. As regras
 do Firestore liberam para a própria pessoa só os campos dela — e-mail, situação
 no grupo e características de atuação continuam fechados, porque são,
@@ -375,8 +518,12 @@ A área da direção tem três larguras, em [`shell.tsx`](src/components/shell.t
 | < 900px | sem sidebar: barra no topo com a conta e tab bar embaixo |
 
 Abaixo de 900px o trilho de ícones sai de cena de propósito: 68px fixos comem
-largura demais na tela de um celular, e os cinco destinos ficam melhor numa tab
-bar ao alcance do polegar — o mesmo padrão da área do participante.
+largura demais na tela de um celular, e os destinos ficam melhor numa tab bar ao
+alcance do polegar — o mesmo padrão da área do participante.
+
+Na tab bar do participante o **Início fica no meio**, com dois vizinhos de cada
+lado: é a aba que se abre mais vezes, e no celular o meio da barra é o ponto
+mais fácil de alcançar com o polegar. Nas pontas a mão precisa se reposicionar.
 
 ## Avisos por notificação
 
@@ -385,46 +532,82 @@ A direção compõe o aviso em `/admin/avisos` (com modelos prontos, inclusive
 peça atual ou todos os integrantes ativos. O aviso entra em `avisos/{id}` com
 status `pendente`.
 
-**A entrega acontece fora do navegador**, em
-[`scripts/enviar-avisos.mjs`](scripts/enviar-avisos.mjs):
+**A entrega acontece fora do navegador**, porque mandar push exige credencial de
+servidor. A função `entregarAviso` dispara na criação do documento: resolve os
+destinatários, envia pelo FCM, grava o resultado no aviso e remove das contas os
+tokens que o FCM recusou.
+
+Existe também `lembrarDosEnsaios`, agendada para 7h30 de São Paulo: procura os
+ensaios de amanhã e cria o aviso "Não esqueça do ensaio!" para os convocados.
+Ela **cria o aviso** em vez de enviar direto, para o lembrete aparecer no
+histórico da tela de Avisos como qualquer outro e a entrega continuar sendo de
+uma função só. O campo `lembreteEm` no ensaio é a trava contra repetição.
+
+O mesmo disparador existe como script, para reenvio manual e para depurar:
 
 ```bash
 npm run avisos           # envia os pendentes
 npm run avisos -- --dry  # só mostra quem receberia
 ```
 
-Mandar push exige credencial de servidor, que não pode ficar no cliente. O
-disparador resolve os destinatários, envia pelo FCM, grava o resultado no aviso
-e remove das contas os tokens que o FCM recusou.
-
 O aparelho entra na lista de destinatários quando a pessoa autoriza os avisos —
 o token vai para `users/{uid}.tokensFcm` e é reconfirmado a cada abertura do
 app, porque tokens do FCM giram. Quem não autoriza continua vendo tudo pela aba
 Ensaios.
 
-Dois pré-requisitos para os avisos saírem de fato:
-
-1. **Chave push da Web** em `NEXT_PUBLIC_FIREBASE_VAPID_KEY` (Configurações do
-   projeto › Cloud Messaging › Certificados push da Web). Sem ela o app pede e
-   guarda a permissão, mas nenhum token é emitido.
-2. **Envio automático** exige o plano Blaze e uma Cloud Function disparada na
-   criação do documento. A lógica do disparador já está no formato que a função
-   usaria; até então, o envio é manual pelo comando acima.
+Num projeto novo, dois pré-requisitos para os avisos saírem: a **chave push da
+Web** em `NEXT_PUBLIC_FIREBASE_VAPID_KEY` (Configurações do projeto › Cloud
+Messaging › Certificados push da Web), sem a qual o app pede a permissão mas
+nenhum token é emitido; e o **plano Blaze**, que as Cloud Functions exigem.
 
 O push é recebido pelo próprio [`public/sw.js`](public/sw.js), pelo evento
 padrão da Web Push API — sem o SDK do Firebase dentro do worker e sem um segundo
 service worker só para mensagens.
+
+## Cloud Functions
+
+Em [`functions/`](functions/), região `southamerica-east1` (São Paulo, mais
+perto do elenco), todas com `maxInstances: 5` — é um grupo de teatro de uma
+igreja, e o teto evita que um erro em laço vire fatura.
+
+| Função | Gatilho | Por que não pode ser no navegador |
+| --- | --- | --- |
+| `entregarAviso` | criação em `avisos/{id}` | mandar push exige credencial de servidor |
+| `lembrarDosEnsaios` | agendada, 7h30 | ninguém está com o app aberto às sete da manhã |
+| `conferirConvite` · `resgatarConvite` | chamada da tela `/convite` | o convite escreve o vínculo conta ↔ ficha |
+| `sincronizarClaims` | escrita em `users/{uid}` | claim de token só o Admin SDK grava |
+
+As duas do convite são as mais delicadas. O vínculo `users/{uid}.personId` é o
+que carrega histórico, personagem e convocação de alguém — se o cliente pudesse
+escrevê-lo, qualquer um escolheria de quem quer ser. E nenhuma regra do
+Firestore consegue conferir "esta pessoa apresentou um código válido", porque
+conferir o código exige ler um documento que quem ainda não tem conta não pode
+ler. Com a função no meio, `convites` fica fechada para todos menos a direção.
+
+`sincronizarClaims` espelha `role` e `personId` no token porque as regras do
+Storage precisam saber de quem é a pasta para deixar a pessoa trocar a própria
+foto. A alternativa — a regra consultar o Firestore a cada envio — custaria uma
+leitura por requisição.
+
+```bash
+firebase deploy --only functions
+```
 
 ## Desempenho
 
 O app é todo renderizado no navegador, então o que se sente como lentidão vem de
 duas fontes: o peso do JavaScript e o número de idas ao Firestore.
 
-**Bundle:** ~363 KB comprimidos na primeira tela, dominados pelo SDK do Firebase
-(Firestore, Auth e Messaging). Os ícones do Phosphor entram só os usados —
-verificado procurando no build ícones que o app não importa. Depois da primeira
-visita o JavaScript vem do cache do navegador, com `Cache-Control` de um ano nos
-arquivos de `/_next/static`.
+**Bundle:** dominado pelo SDK do Firebase (Firestore, Auth e Messaging), que
+sozinho responde por metade do JavaScript da primeira tela. Os ícones do
+Phosphor entram só os usados — verificado procurando no build ícones que o app
+não importa. Depois da primeira visita o JavaScript vem do cache do navegador,
+com `Cache-Control` de um ano nos arquivos de `/_next/static`, e do service
+worker quando não há rede.
+
+O custo que sobra na primeira abertura de um navegador zerado é esse: baixar e
+iniciar o SDK, e esperar o Firebase confirmar a sessão. É igual em todas as
+telas — o painel da direção não é mais pesado que o Início.
 
 **Idas ao banco:** a regra é evitar consulta encadeada e nunca baixar uma
 coleção inteira para mostrar um número.
@@ -440,25 +623,53 @@ coleção inteira para mostrar um número.
 - O total de cenas da peça é gravado em `plays.totalCenas` na publicação do
   roteiro, então a tela do personagem não precisa varrer as falas para saber o
   tamanho da peça.
+- O **painel da direção** conta no servidor o que só vira número na tela —
+  quantas pessoas ativas, quantas falas o roteiro tem. Ele escrevia "42" depois
+  de baixar as 42 fichas, e o tamanho do roteiro depois de baixar o roteiro.
+  Só vem como documento o que a tela lista de fato: os personagens, porque ela
+  nomeia os que estão sem ator, e os ensaios, porque ela abre o próximo.
 
 O roteiro e o editor continuam lendo todas as falas, porque é o que eles
 mostram.
 
-**Cache de tela:** `useCarregar` guarda o resultado por sessão em
-[`hooks.ts`](src/lib/hooks.ts). Voltar a uma aba mostra na hora o que já foi
-carregado e revalida por trás, em vez de exibir esqueleto e buscar tudo de novo.
+**Imagens:** toda foto que aparece pequena tem uma versão pequena de verdade.
+Os círculos de 28 a 56 pixels das listas usam uma miniatura de 128; o quadrado
+de 64 da lista de peças usa uma de 192. As duas sobem junto com a original, na
+mesma escolha de arquivo — gerar depois obrigaria a baixar a grande de volta.
+A lista de peças baixava 522 KB de capa para desenhar sete quadradinhos; hoje
+baixa 51 KB. [`scripts/gerar-miniaturas.mjs`](scripts/gerar-miniaturas.mjs)
+cobre as imagens que subiram antes disso existir.
 
-Duas decisões desse cache merecem nota:
+**Cache de tela:** `useCarregar` guarda o resultado em
+[`hooks.ts`](src/lib/hooks.ts), em memória e **também em disco**, no
+`localStorage`. Voltar a uma aba mostra na hora o que já foi carregado e
+revalida por trás, em vez de exibir esqueleto e buscar tudo de novo; o disco faz
+o mesmo valer na abertura seguinte do app, não só dentro da sessão.
+
+Quatro decisões desse cache merecem nota:
 
 - **O nome é obrigatório** (`useCarregar("inicio", …)`). Metade das telas usa
   `[]` como dependência; sem um nome por chamada, elas colidiriam na mesma
   chave e uma mostraria os dados da outra. Há uma checagem simples possível:
   procurar por `useCarregar<` no `src/` e conferir que todo nome é único.
-- **O cache é esvaziado na troca de conta**, em `auth-context`. Sem isso, quem
+- **A chave do disco leva o uid**, e o que é de outra conta é varrido na
+  entrada. Cache de tela em disco é dado de alguém no aparelho: sem isso, quem
   entrasse depois veria por um instante os dados de quem saiu.
+- **A leitura do disco passa por `useSyncExternalStore`.** Ler `localStorage`
+  direto na renderização diverge da pré-renderização e o React derruba a
+  página inteira com erro de hidratação.
+- **O disco só é limpo em troca de conta de verdade.** A marca de "qual conta
+  estava aqui" começa indefinida, não nula — com nula, toda abertura parecia
+  troca de conta e o cache era apagado antes de ser usado uma vez.
 
 Erros não entram no cache: voltar a uma tela que falhou tenta de novo, em vez de
 exibir na hora a falha anterior.
+
+**Sessão otimista:** o app guarda um retrato da última sessão e desenha a tela
+com ele enquanto o Firebase confirma quem é. A confirmação (`accounts:lookup`)
+leva meio segundo e antes segurava a primeira pintura — o app ficava em branco
+esperando saber uma coisa que já sabia. Quando a confirmação chega e desmente o
+retrato, o que está na tela é trocado.
 
 ## Comandos
 
@@ -472,8 +683,16 @@ exibir na hora a falha anterior.
 | `npm run lint`      | ESLint                                           |
 | `npm run admin`     | cria ou promove uma conta a administrador        |
 | `npm run participante` | cria uma conta de participante                |
+| `npm run convite`   | gera o convite de primeiro acesso de alguém      |
 | `npm run seed`      | cadastra as características iniciais             |
+| `npm run acervo`    | sobe peças antigas, elenco e direção em lote     |
 | `npm run avisos`    | entrega os avisos pendentes (`-- --dry` simula)  |
+| `npm run claims`    | ressincroniza as claims de todas as contas       |
+| `npm run miniaturas` | gera a versão pequena das imagens que não têm   |
+
+Os scripts que gravam em lote conferem por padrão e só escrevem com
+`-- --aplicar`. Eles precisam da conta de serviço em
+`GOOGLE_APPLICATION_CREDENTIALS` — ver [Criar um administrador](#4-criar-um-administrador).
 
 Não existe `npm start`: com `output: "export"` o Next.js não sobe servidor —
 use `npm run preview`.
@@ -482,12 +701,22 @@ use `npm run preview`.
 
 Todo o aplicativo é renderizado no navegador, então ele é exportado como site
 estático (`output: "export"` em [`next.config.ts`](next.config.ts)) e servido
-pelo Firebase Hosting, dentro do plano gratuito — sem servidor e sem Cloud
-Functions.
+pelo Firebase Hosting — sem servidor de renderização.
 
 ```bash
 npm run deploy     # next build && firebase deploy --only hosting
 ```
+
+Regras e funções publicam à parte, porque mudam em ritmo próprio:
+
+```bash
+firebase deploy --only firestore:rules,storage
+firebase deploy --only functions
+```
+
+**Confira o resultado do build, não o da linha inteira.** `npm run build | grep
+… && firebase deploy` publica mesmo com o build quebrado: quem decide é o
+`grep`, e ele terminou bem.
 
 É essa escolha que explica as rotas de detalhe com query string
 (`/admin/pecas/detalhe?id=…`): rota dinâmica em exportação estática exigiria
@@ -496,9 +725,22 @@ conhecer todos os ids no momento do build, e eles vêm do Firestore.
 As chaves `NEXT_PUBLIC_*` do Firebase são públicas por natureza: a proteção real
 dos dados vem das regras do Firestore, por isso publicá-las não é opcional.
 
-## Próximos passos (seção 11 do briefing)
+## O que ainda falta
 
-Ficaram de fora do MVP, como combinado: confirmação de presença e faltas,
-notificações e lembretes, anotações pessoais no roteiro, busca no roteiro, modo
-escuro, exportação em PDF, leitura offline, integração com o Google Calendar,
-upload de figurinos, equipes técnicas e relatórios.
+Da lista de evoluções do briefing, já entraram: confirmação de presença e
+faltas, notificações e lembretes, modo escuro (é o padrão) e a leitura offline
+— parcial, o app abre sem rede e mostra o que já leu.
+
+Continuam de fora: anotações pessoais no roteiro, busca no roteiro, exportação
+em PDF, integração com o Google Calendar, upload de figurinos, equipes técnicas
+e relatórios.
+
+Fora do briefing, o que o projeto deve a si mesmo:
+
+- **Não existe teste automatizado.** É a maior lacuna. Foi o que deixou passar
+  um campo faltando na lista das regras do Firestore, que quebrou a troca de
+  foto sem nenhum erro aparecer — o arquivo subia e a ficha não atualizava.
+- Ensaio apagado não limpa as presenças que ficaram embaixo dele.
+- As funções de convite não têm limite de tentativa. O código tem 8 caracteres
+  e vale 7 dias, então adivinhar é caro, mas o teto não existe.
+- O `email` continua legível na ficha que todo o elenco lê.
