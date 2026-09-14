@@ -86,6 +86,9 @@ service cloud.firestore {
                .hasOnly([
                  'nome',
                  'fotoUrl',
+                 // A miniatura sobe junto com a foto, na mesma gravação. Sem
+                 // ela aqui, trocar de foto era negado por inteiro.
+                 'fotoMiniUrl',
                  'jaAtuou',
                  'experiencia',
                  'pecasAnteriores',
