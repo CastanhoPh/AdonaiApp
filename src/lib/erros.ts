@@ -22,6 +22,16 @@ export function mensagemDeErro(erro: unknown): string {
       return "Sem conexão. Verifique sua internet.";
     case "permission-denied":
       return "Você não tem permissão para esta ação.";
+    /*
+     * Falhas de rede do Firestore. Sem estas, a mensagem que chegava à tela era
+     * a do SDK, em inglês — "Failed to get document because the client is
+     * offline" — no meio de um app inteiro em português.
+     */
+    case "unavailable":
+    case "deadline-exceeded":
+      return "Sem conexão com o servidor agora. Verifique a internet e tente de novo.";
+    case "resource-exhausted":
+      return "O servidor está sobrecarregado. Tente de novo em instantes.";
     default:
       return (erro as Error)?.message ?? "Não foi possível concluir a ação.";
   }

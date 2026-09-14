@@ -52,3 +52,7 @@ next-env.d.ts
 
 # dependências das Cloud Functions
 functions/node_modules/
+
+# Sessões de teste geradas por scripts locais. Contêm tokens; nunca versionar.
+.s-*.json
+.sessao.mjs

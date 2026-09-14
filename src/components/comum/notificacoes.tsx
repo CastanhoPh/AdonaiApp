@@ -25,7 +25,17 @@ export function ControleNotificacoes({
 }) {
   // Só monta em árvore já hidratada (dentro de `Protegido`), então pode ler o
   // estado do navegador direto no valor inicial.
-  const { usuario } = useAuth();
+  /*
+   * `uid`, não `usuario`.
+   *
+   * Desde que o app passou a abrir com a última sessão conhecida, `usuario` —
+   * o objeto confirmado pelo Firebase — fica nulo nos primeiros instantes.
+   * Quem tocasse em "Permitir avisos" nessa janela via "Avisos autorizados" e
+   * não era registrado em lugar nenhum: permissão dada, aparelho de fora da
+   * lista, e nada na tela dizendo isso. `uid` vale desde o primeiro quadro, e
+   * a gravação espera a sessão de qualquer jeito, dentro do próprio SDK.
+   */
+  const { uid } = useAuth();
   const [estado, setEstado] = useState<EstadoNotificacoes>(() => estadoDasNotificacoes());
   const [pedindo, setPedindo] = useState(false);
 
@@ -33,7 +43,7 @@ export function ControleNotificacoes({
     setPedindo(true);
     const resultado = await pedirNotificacoes();
     // Com a permissão dada, o aparelho já entra na lista de destinatários.
-    if (resultado === "granted" && usuario) await registrarAparelho(usuario.uid);
+    if (resultado === "granted" && uid) await registrarAparelho(uid);
     setEstado(resultado);
     setPedindo(false);
     onMudar?.(resultado);

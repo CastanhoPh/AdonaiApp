@@ -386,16 +386,28 @@ export interface CaracteristicasAtribuidas {
 
 const SEM_ATRIBUICOES: CaracteristicasAtribuidas = { pessoas: {}, papeis: {} };
 
-/** Só a direção consegue ler; para participante a regra nega e devolve vazio. */
+/**
+ * As características que a direção atribuiu a pessoas e a papéis.
+ *
+ * Falha **não** vira lista vazia. A versão anterior engolia qualquer erro e
+ * devolvia vazio, para o caso de um participante chamar — só que quem chama
+ * são três telas atrás de `apenasAdmin`, e participante nenhum passa por aqui.
+ * O que o `catch` fazia de fato era transformar uma oscilação de rede em
+ * "esta pessoa não tem característica nenhuma": a tela abria com tudo
+ * desmarcado e o próximo Salvar gravava esse vazio por cima da avaliação da
+ * direção, sem erro e sem volta.
+ *
+ * Agora o erro sobe. A tela mostra o estado de falha, e não há o que salvar
+ * por cima do que não foi lido.
+ *
+ * Documento ausente continua sendo vazio legítimo: significa que ainda não
+ * houve atribuição nenhuma, que é diferente de não ter conseguido ler.
+ */
 export async function buscarCaracteristicasAtribuidas(): Promise<CaracteristicasAtribuidas> {
-  try {
-    const snap = await getDoc(REF_ATRIBUICOES());
-    if (!snap.exists()) return SEM_ATRIBUICOES;
-    const dados = snap.data() as Partial<CaracteristicasAtribuidas>;
-    return { pessoas: dados.pessoas ?? {}, papeis: dados.papeis ?? {} };
-  } catch {
-    return SEM_ATRIBUICOES;
-  }
+  const snap = await getDoc(REF_ATRIBUICOES());
+  if (!snap.exists()) return SEM_ATRIBUICOES;
+  const dados = snap.data() as Partial<CaracteristicasAtribuidas>;
+  return { pessoas: dados.pessoas ?? {}, papeis: dados.papeis ?? {} };
 }
 
 /**
