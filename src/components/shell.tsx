@@ -74,16 +74,21 @@ export function Protegido({
   apenasAdmin?: boolean;
   children: ReactNode;
 }) {
-  const { carregando, usuario, ehAdmin, pessoa } = useAuth();
+  const { carregando, uid, ehAdmin, pessoa } = useAuth();
   const router = useRouter();
 
+  /*
+   * `uid` vale a última sessão conhecida, então a tela aparece sem esperar o
+   * Firebase confirmar. Quando ele confirma que não há sessão, `uid` vira nulo
+   * e o efeito manda para o login como antes.
+   */
   useEffect(() => {
-    if (!carregando && !usuario && firebaseConfigurado) router.replace("/login");
-  }, [carregando, usuario, router]);
+    if (!carregando && !uid && firebaseConfigurado) router.replace("/login");
+  }, [carregando, uid, router]);
 
   if (!firebaseConfigurado) return <FirebaseAusente />;
 
-  if (carregando || !usuario) {
+  if (carregando || !uid) {
     return (
       <main className="mx-auto w-full max-w-[560px] px-5 py-8">
         <Carregando texto="Abrindo o AdonaiApp" />
@@ -109,9 +114,9 @@ export function Protegido({
 
   return (
     <>
-      <RegistroAvisos uid={usuario.uid} />
+      <RegistroAvisos uid={uid} />
       <PrimeiroAcesso
-        uid={usuario.uid}
+        uid={uid}
         ehAdmin={ehAdmin}
         pessoa={pessoa}
         naAreaDaDirecao={apenasAdmin}

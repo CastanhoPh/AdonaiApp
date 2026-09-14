@@ -11,7 +11,7 @@ import { QrCode } from "@phosphor-icons/react";
 import { Aviso, Botao, BotaoLink, Campo, Divisor, Entrada } from "@/components/ui";
 
 export default function Login() {
-  const { usuario, ehAdmin, carregando, entrar, recuperarSenha } = useAuth();
+  const { uid, ehAdmin, carregando, entrar, recuperarSenha } = useAuth();
   const router = useRouter();
   const { enviando, erro, definirErro, enviar } = useEnvio();
 
@@ -22,8 +22,8 @@ export default function Login() {
 
   // Login identifica o papel e encaminha para a área correspondente.
   useEffect(() => {
-    if (!carregando && usuario) router.replace(ehAdmin ? "/admin" : "/inicio");
-  }, [carregando, usuario, ehAdmin, router]);
+    if (!carregando && uid) router.replace(ehAdmin ? "/admin" : "/inicio");
+  }, [carregando, uid, ehAdmin, router]);
 
   async function aoEntrar(evento: React.FormEvent) {
     evento.preventDefault();

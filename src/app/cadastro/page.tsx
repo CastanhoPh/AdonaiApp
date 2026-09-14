@@ -9,7 +9,7 @@ import { MolduraAcesso } from "@/components/acesso/moldura-acesso";
 import { Aviso, Botao, Campo, Entrada } from "@/components/ui";
 
 export default function Cadastro() {
-  const { usuario, carregando, cadastrar } = useAuth();
+  const { uid, carregando, cadastrar } = useAuth();
   const router = useRouter();
   const { enviando, erro, definirErro, enviar } = useEnvio();
 
@@ -19,8 +19,8 @@ export default function Cadastro() {
   const [confirmacao, setConfirmacao] = useState("");
 
   useEffect(() => {
-    if (!carregando && usuario) router.replace("/inicio");
-  }, [carregando, usuario, router]);
+    if (!carregando && uid) router.replace("/inicio");
+  }, [carregando, uid, router]);
 
   async function aoCadastrar(evento: React.FormEvent) {
     evento.preventDefault();

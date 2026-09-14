@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import {
@@ -29,6 +30,15 @@ export { mensagemDeErro } from "./erros";
 interface AuthState {
   carregando: boolean;
   usuario: User | null;
+  /**
+   * Quem está usando o app, mesmo antes de o Firebase confirmar a sessão.
+   *
+   * Use este em vez de `usuario` para decidir "há alguém logado?" e para
+   * identificar a pessoa na interface. `usuario` continua sendo o objeto real
+   * do Firebase e só existe depois da confirmação — quem precisa escrever
+   * espera por ele de qualquer jeito, porque o SDK também espera.
+   */
+  uid: string | null;
   conta: UserAccount | null;
   pessoa: Person | null;
   ehAdmin: boolean;
@@ -77,12 +87,127 @@ async function alinharToken(user: User, conta: UserAccount): Promise<void> {
   }
 }
 
+/**
+ * A última sessão vista neste aparelho, para abrir sem esperar a rede.
+ *
+ * Guarda só o que a interface precisa para se desenhar: quem é, o papel e a
+ * ficha. Nada disso dá acesso a coisa nenhuma — as regras do Firestore só
+ * respondem ao token, que não está aqui.
+ */
+interface SessaoLembrada {
+  uid: string;
+  conta: UserAccount;
+  pessoa: Person | null;
+  em: number;
+}
+
+const LEMBRANCA = "adonai:sessao";
+/** Depois disto o palpite não vale mais: melhor o esqueleto que um retrato antigo. */
+const VALIDADE_DA_LEMBRANCA = 30 * 24 * 60 * 60 * 1000;
+
+function lerSessaoLembrada(): SessaoLembrada | null {
+  if (typeof window === "undefined" || !firebaseConfigurado) return null;
+  try {
+    const cru = window.localStorage.getItem(LEMBRANCA);
+    if (!cru) return null;
+    const s = JSON.parse(cru) as SessaoLembrada;
+    if (!s?.uid || !s.conta || !s.em || Date.now() - s.em > VALIDADE_DA_LEMBRANCA) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+/*
+ * A leitura do disco precisa ser estável e compatível com a hidratação.
+ *
+ * `useSyncExternalStore` existe justamente para valor que só o cliente tem: o
+ * React usa o retrato do servidor (nulo) enquanto hidrata e troca para o do
+ * cliente logo depois, sem acusar divergência. Ler direto no corpo do
+ * componente rendia o erro #418 — o HTML pré-renderizado dizia "carregando" e
+ * o cliente já dizia "entrou".
+ *
+ * O valor é calculado uma vez e guardado: `getSnapshot` que devolve objeto
+ * novo a cada chamada põe o React em laço infinito.
+ */
+let retrato: SessaoLembrada | null | undefined;
+
+function instantaneoDaSessao(): SessaoLembrada | null {
+  if (retrato === undefined) {
+    retrato = lerSessaoLembrada();
+    // O cache de telas em disco só entrega dados da conta atual; sem registrar
+    // o dono aqui, a primeira renderização não enxergaria nada.
+    if (retrato) definirContaDoCache(retrato.uid);
+  }
+  return retrato;
+}
+
+/** No servidor não há sessão nenhuma: é o que o HTML pré-renderizado mostra. */
+function semSessaoNoServidor(): SessaoLembrada | null {
+  return null;
+}
+
+/** A lembrança não muda sozinha durante a vida da página. */
+function assinarSessao(): () => void {
+  return () => {};
+}
+
+function lembrarSessao(s: Omit<SessaoLembrada, "em">): void {
+  retrato = { ...s, em: Date.now() };
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LEMBRANCA, JSON.stringify(retrato));
+  } catch {
+    // Cota ou janela anônima: o app só perde o atalho de abertura.
+  }
+}
+
+function esquecerSessao(): void {
+  retrato = null;
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(LEMBRANCA);
+  } catch {
+    // Sem acesso ao armazenamento: não há o que esquecer.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Sem as chaves do Firebase não há o que carregar.
-  const [carregando, setCarregando] = useState(firebaseConfigurado);
+  /*
+   * Abre com a última sessão conhecida em vez de esperar o Firebase.
+   *
+   * Ao carregar a página, o SDK valida a sessão guardada com uma ida ao
+   * servidor (`accounts:lookup`) e só então avisa quem está logado. Medido num
+   * celular a 4G, essa ida começava aos 450ms e terminava aos 750ms — e o app
+   * inteiro ficava num esqueleto até lá, embora já soubesse de quem era a
+   * sessão e já tivesse os dados da tela em disco.
+   *
+   * Agora a última sessão vale como resposta provisória: a tela aparece na
+   * hora e a confirmação chega por trás. Se o Firebase disser que não há
+   * sessão, o efeito abaixo limpa tudo e manda para o login, como sempre fez.
+   *
+   * Isto não afrouxa nada: quem decide o que pode ser lido são as regras do
+   * Firestore, no servidor, e elas só respondem ao token de verdade. O que
+   * aparece nesse intervalo é o que já estava guardado neste mesmo aparelho.
+   */
+  const lembrada = useSyncExternalStore(assinarSessao, instantaneoDaSessao, semSessaoNoServidor);
+
+  const [carregandoAuth, setCarregandoAuth] = useState(firebaseConfigurado);
+  /*
+   * Trava de uma via: assim que o Firebase responde uma vez, a lembrança para
+   * de valer para sempre nesta página. Sem isso, alguém sair e outra pessoa
+   * entrar faria o palpite antigo reaparecer durante o carregamento do novo
+   * perfil — e a segunda pessoa veria por um instante a tela da primeira.
+   */
+  const [jaConfirmou, setJaConfirmou] = useState(false);
   const [usuario, setUsuario] = useState<User | null>(null);
-  const [conta, setConta] = useState<UserAccount | null>(null);
-  const [pessoa, setPessoa] = useState<Person | null>(null);
+  const [contaReal, setContaReal] = useState<UserAccount | null>(null);
+  const [pessoaReal, setPessoaReal] = useState<Person | null>(null);
+
+  const palpite = jaConfirmou ? null : lembrada;
+  const conta = contaReal ?? palpite?.conta ?? null;
+  const pessoa = pessoaReal ?? palpite?.pessoa ?? null;
+  const carregando = carregandoAuth && !palpite;
   // Última conta vista, para esvaziar o cache de telas quando ela muda.
   /*
    * `undefined` = ainda não observamos nenhuma sessão nesta carga da página.
@@ -111,8 +236,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     await alinharToken(user, registro);
-    setConta(registro);
-    setPessoa(registro.personId ? await buscarPessoa(registro.personId) : null);
+    const doCadastro = registro.personId ? await buscarPessoa(registro.personId) : null;
+    setContaReal(registro);
+    setPessoaReal(doCadastro);
+    lembrarSessao({ uid: user.uid, conta: registro, pessoa: doCadastro });
   }, []);
 
   useEffect(() => {
@@ -137,10 +264,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ultimoUid.current = uid;
       }
       setUsuario(user);
+      setJaConfirmou(true);
       if (!user) {
-        setConta(null);
-        setPessoa(null);
-        setCarregando(false);
+        // O Firebase disse que não há sessão: o palpite era velho, cai fora.
+        esquecerSessao();
+        setContaReal(null);
+        setPessoaReal(null);
+        setCarregandoAuth(false);
         return;
       }
       /*
@@ -151,15 +281,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
        * o formulário de cadastro cobre tudo. Renovação de token mantém o mesmo
        * uid e não mexe no estado, para não piscar o esqueleto.
        */
-      if (trocou) setCarregando(true);
+      if (trocou) setCarregandoAuth(true);
       try {
         await carregarPerfil(user);
       } catch (erro) {
         console.error("Falha ao carregar o perfil:", erro);
-        setConta(null);
-        setPessoa(null);
+        setContaReal(null);
+        setPessoaReal(null);
       } finally {
-        setCarregando(false);
+        setCarregandoAuth(false);
       }
     });
   }, [carregarPerfil]);
@@ -187,6 +317,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sair = useCallback(async () => {
+    // Esquece antes de sair: se a página fechar no meio, não sobra palpite.
+    esquecerSessao();
     await signOut(auth);
   }, []);
 
@@ -198,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       carregando,
       usuario,
+      uid: usuario?.uid ?? palpite?.uid ?? null,
       conta,
       pessoa,
       ehAdmin: conta?.role === "admin",
@@ -207,7 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sair,
       recarregar,
     }),
-    [carregando, usuario, conta, pessoa, entrar, cadastrar, recuperarSenha, sair, recarregar],
+    [carregando, usuario, palpite, conta, pessoa, entrar, cadastrar, recuperarSenha, sair, recarregar],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

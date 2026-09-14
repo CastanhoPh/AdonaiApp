@@ -8,13 +8,13 @@ import { Carregando, Vazio } from "@/components/ui";
 
 /** Porta de entrada: encaminha para a área do participante ou da direção. */
 export default function Raiz() {
-  const { carregando, usuario, ehAdmin } = useAuth();
+  const { carregando, uid, ehAdmin } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!firebaseConfigurado || carregando) return;
-    router.replace(!usuario ? "/login" : ehAdmin ? "/admin" : "/inicio");
-  }, [carregando, usuario, ehAdmin, router]);
+    router.replace(!uid ? "/login" : ehAdmin ? "/admin" : "/inicio");
+  }, [carregando, uid, ehAdmin, router]);
 
   if (!firebaseConfigurado) {
     return (

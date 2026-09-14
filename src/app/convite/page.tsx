@@ -43,7 +43,7 @@ export default function Convite() {
 
 function ConteudoConvite() {
   const doLink = normalizarCodigo(useSearchParams().get("c") ?? "");
-  const { usuario, ehAdmin, carregando, entrar } = useAuth();
+  const { uid, ehAdmin, carregando, entrar } = useAuth();
   const router = useRouter();
   const { enviando, erro, definirErro, enviar } = useEnvio();
 
@@ -59,8 +59,8 @@ function ConteudoConvite() {
 
   // Quem já tem sessão não precisa de convite.
   useEffect(() => {
-    if (!carregando && usuario) router.replace(ehAdmin ? "/admin" : "/inicio");
-  }, [carregando, usuario, ehAdmin, router]);
+    if (!carregando && uid) router.replace(ehAdmin ? "/admin" : "/inicio");
+  }, [carregando, uid, ehAdmin, router]);
 
   async function conferir(qual: string) {
     const limpo = normalizarCodigo(qual);
