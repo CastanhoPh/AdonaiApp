@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowsDownUp, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import {
   atualizarFala,
@@ -114,6 +114,9 @@ export function AbaRoteiro({ playId }: { playId: string }) {
   const cenas = useMemo(() => estruturar(falas), [falas]);
 
   const [chaveFoco, setChaveFoco] = useState<string | null>(null);
+  /** Linha que acabou de ser apontada pelo aviso, para piscar ao chegar. */
+  const [apontada, setApontada] = useState<string | null>(null);
+  const elementosDasLinhas = useRef(new Map<string, HTMLLIElement | null>());
   const cenaFoco = cenas.find((c) => `${c.ato}-${c.cena}` === chaveFoco) ?? cenas[0] ?? null;
 
   /** Texto em edição por linha, gravado no blur. */
@@ -131,8 +134,41 @@ export function AbaRoteiro({ playId }: { playId: string }) {
   const [importando, setImportando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const semPersonagem = falas.filter((f) => f.tipo === "fala" && f.characterIds.length === 0).length;
+  const semPersonagem = useMemo(
+    () => falas.filter((f) => f.tipo === "fala" && f.characterIds.length === 0),
+    [falas],
+  );
   const vinculadas = falas.filter((f) => f.tipo === "fala" && f.characterIds.length > 0).length;
+
+  /**
+   * Leva até a próxima fala sem personagem.
+   *
+   * O aviso dizia que existiam e deixava a direção procurar — num roteiro de
+   * cem linhas espalhadas por seis cenas, é procurar agulha. Daqui em diante
+   * ele leva até lá: muda de cena se precisar, rola até a linha e pisca. Com
+   * mais de uma, cada toque vai para a seguinte e volta ao começo no fim.
+   */
+  function irParaSemVinculo() {
+    if (semPersonagem.length === 0) return;
+    const atual = semPersonagem.findIndex((f) => f.id === apontada);
+    const alvo = semPersonagem[(atual + 1) % semPersonagem.length];
+    setChaveFoco(`${alvo.ato}-${alvo.cena}`);
+    setApontada(alvo.id);
+  }
+
+  /*
+   * A rolagem espera a cena trocar.
+   *
+   * Quando a fala está em outra cena, o elemento só existe depois que o React
+   * redesenha — rolar no mesmo instante do clique não acharia nada.
+   */
+  useEffect(() => {
+    if (!apontada) return;
+    const elemento = elementosDasLinhas.current.get(apontada);
+    elemento?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const relogio = setTimeout(() => setApontada(null), 2400);
+    return () => clearTimeout(relogio);
+  }, [apontada, chaveFoco]);
 
   async function gravarTexto(fala: ScriptLine) {
     const texto = rascunhos[fala.id];
@@ -294,11 +330,23 @@ export function AbaRoteiro({ playId }: { playId: string }) {
             </Aviso>
           </div>
         ) : null}
-        {semPersonagem > 0 ? (
+        {semPersonagem.length > 0 ? (
           <div className="mb-4">
             <Aviso tom="aviso">
-              {pluralizar(semPersonagem, "fala está", "falas estão")} sem personagem vinculado e não
-              serão destacadas para ninguém.
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {semPersonagem.length === 1
+                    ? "1 fala está sem personagem e não será destacada para ninguém."
+                    : `${semPersonagem.length} falas estão sem personagem e não serão destacadas para ninguém.`}
+                </span>
+                <button
+                  type="button"
+                  onClick={irParaSemVinculo}
+                  className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+                >
+                  {semPersonagem.length === 1 ? "Ver a fala" : "Ver a próxima"}
+                </button>
+              </div>
             </Aviso>
           </div>
         ) : null}
@@ -397,8 +445,12 @@ export function AbaRoteiro({ playId }: { playId: string }) {
                   {cenaFoco.falas.map((fala, indice) => (
                     <li
                       key={fala.id}
+                      ref={(el) => {
+                        elementosDasLinhas.current.set(fala.id, el);
+                      }}
                       className={juntar(
-                        "rounded-[8px] border px-3 py-2.5",
+                        "scroll-mt-24 rounded-[8px] border px-3 py-2.5 transition-shadow",
+                        apontada === fala.id && "ring-2 ring-state-warning",
                         fala.tipo === "acao"
                           ? "border-stroke-frame bg-surface-lower"
                           : "border-stroke-frame bg-surface-card",
@@ -674,10 +726,11 @@ export function AbaRoteiro({ playId }: { playId: string }) {
             O elenco passará a ler {pluralizar(falas.length, "linha", "linhas")} desta peça, com as
             falas de cada um destacadas.
           </p>
-          {semPersonagem > 0 ? (
+          {semPersonagem.length > 0 ? (
             <Aviso tom="aviso">
-              {pluralizar(semPersonagem, "fala continua", "falas continuam")} sem personagem
-              vinculado e não serão destacadas.
+              {semPersonagem.length === 1
+                ? "1 fala continua sem personagem e não será destacada."
+                : `${semPersonagem.length} falas continuam sem personagem e não serão destacadas.`}
             </Aviso>
           ) : null}
           {erro ? <Aviso>{erro}</Aviso> : null}

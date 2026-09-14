@@ -33,13 +33,17 @@ const DA_DIRECAO = [
 const MINIMO_DE_TEXTO = 40;
 
 /**
- * O esqueleto de carregamento, que é `role="status"` e só ele no app inteiro.
+ * O esqueleto de carregamento.
  *
  * Esperar ele sumir é o que separa "a tela abriu" de "a moldura apareceu". Sem
  * isso o teste media a barra de navegação: passava com a tela ainda vazia por
  * baixo, que é justamente o defeito que ele existe para achar.
+ *
+ * O atributo, e não `[role="status"]`: `Aviso` usa o mesmo papel, e uma tela
+ * com aviso na tela — "1 fala está sem personagem" — ficaria para sempre
+ * parecendo que ainda carrega.
  */
-const CARREGANDO = '[role="status"]';
+const CARREGANDO = "[data-carregando]";
 
 /** Por quanto tempo seguido a tela precisa estar pronta para valer. */
 const ESTAVEL_POR = 500;

@@ -434,7 +434,20 @@ export function Esqueleto({ className }: { className?: string }) {
 
 export function Carregando({ texto = "Carregando" }: { texto?: string }) {
   return (
-    <div role="status" aria-label={texto} className="esqueleto-atrasado space-y-3 py-2">
+    <div
+      role="status"
+      aria-label={texto}
+      /*
+       * Marca só o esqueleto de carregamento.
+       *
+       * `Aviso` também é `role="status"` — os dois são regiões que o leitor de
+       * tela anuncia sem roubar o foco. A verificação de telas espera "sem
+       * esqueleto" para decidir que a tela assentou, e com o papel sozinho uma
+       * tela com aviso na tela ficaria para sempre parecendo que carrega.
+       */
+      data-carregando=""
+      className="esqueleto-atrasado space-y-3 py-2"
+    >
       <Esqueleto className="h-[104px] rounded-[16px]" />
       <Esqueleto className="h-[72px] rounded-[16px]" />
       <Esqueleto className="h-[72px] rounded-[16px]" />
