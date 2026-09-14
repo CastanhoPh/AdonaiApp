@@ -56,3 +56,9 @@ functions/node_modules/
 # Sessões de teste geradas por scripts locais. Contêm tokens; nunca versionar.
 .s-*.json
 .sessao.mjs
+
+# Cópias de segurança. Por padrão ficam fora do projeto (`AdonaiApp-backups`,
+# ao lado desta pasta), mas `--destino` aceita qualquer lugar — e elas têm
+# telefone, data de nascimento e contato de responsável de menor. Nunca em git.
+AdonaiApp-backups/
+*-backups/

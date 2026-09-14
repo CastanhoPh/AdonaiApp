@@ -758,6 +758,41 @@ A sessão dos testes é emitida na hora pelo Admin SDK e descartada no fim. **N�
 existe arquivo de sessão em disco** — a versão anterior guardava um, e ele
 acabou num commit público, o que obrigou a revogar as sessões de duas contas.
 
+## Cópia de segurança
+
+```bash
+npm run backup                              # grava a cópia
+npm run restaurar -- <pasta>                # confere o que voltaria
+npm run restaurar -- <pasta> --aplicar      # grava
+```
+
+A cópia vai para `AdonaiApp-backups`, **ao lado** da pasta do projeto — fora do
+repositório de propósito: ela tem telefone, data de nascimento e contato de
+responsável de menor, e isso não entra em git nem por acidente. O `.gitignore`
+cobre o padrão caso alguém aponte `--destino` para dentro.
+
+Pesa cerca de 1,2 MB: `banco.json` com todas as coleções e **as subcoleções**
+(`privado/contato`, as presenças de cada ensaio, personagens e falas de cada
+peça — nada disso vem junto com o documento pai), mais os arquivos do Storage
+com o token de download de cada um. O token importa: o endereço gravado na
+ficha carrega ele, e um arquivo reposto com token novo deixaria toda ficha
+apontando para o nada.
+
+**Por que isto existe:** o Firestore está sem recuperação por ponto no tempo e
+o Storage sem versionamento. O que for apagado ou sobrescrito não tem de onde
+voltar — já aconteceu com uma foto de perfil. O app se reconstrói do código; o
+acervo, não. São 18 peças, 123 personagens e 119 participações que alguém
+sentou e digitou.
+
+A restauração **não apaga nada**. Escreve o que está na cópia; o que existe
+hoje e não está nela continua onde está e aparece numa lista de "a mais", para
+você decidir. Restauração é o momento de mais pressa e menos calma, e é o pior
+momento para um script decidir sozinho que algo é lixo.
+
+Os dois caminhos foram exercidos: um campo estragado de propósito foi detectado
+e voltou exatamente ao valor anterior, e um arquivo ausente foi identificado
+para reposição com o token original.
+
 ## Comandos
 
 | Comando             | O que faz                                        |
@@ -769,6 +804,8 @@ acabou num commit público, o que obrigou a revogar as sessões de duas contas.
 | `npm run typecheck` | verificação de tipos                             |
 | `npm run lint`      | ESLint                                           |
 | `npm run verificar` | dados, permissões, imagens e telas contra o que está no ar |
+| `npm run backup`    | cópia do banco e dos arquivos, fora do repositório |
+| `npm run restaurar` | devolve o que a cópia guardou (`-- <pasta> --aplicar`) |
 | `npm run admin`     | cria ou promove uma conta a administrador        |
 | `npm run participante` | cria uma conta de participante                |
 | `npm run convite`   | gera o convite de primeiro acesso de alguém      |
@@ -836,6 +873,9 @@ Fora do briefing, o que o projeto deve a si mesmo:
   gravação de verdade exige um lugar para gravar que não seja a produção: ou o
   emulador do Firestore (que precisa de Java instalado), ou um segundo projeto
   Firebase só para teste.
+- A cópia de segurança é manual: ninguém a roda sozinho. Rodar `npm run backup`
+  de vez em quando é o que existe hoje; backup agendado no próprio Firebase
+  seria o passo seguinte.
 - A contagem de tentativas em `limites` não é varrida sozinha. Os documentos
   carregam `expiraEm` para uma política de TTL do Firestore cuidar disso; a
   política ainda não foi criada no console. São poucos documentos (um por

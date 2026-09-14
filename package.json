@@ -10,6 +10,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verificar": "node scripts/verificar/index.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restaurar": "node scripts/restaurar.mjs",
     "admin": "node scripts/admin.mjs",
     "participante": "node scripts/participante.mjs",
     "convite": "node scripts/convite.mjs",
