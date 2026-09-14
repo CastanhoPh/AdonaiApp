@@ -185,17 +185,14 @@ export async function buscarPessoa(id: string): Promise<Person | null> {
 }
 
 export async function criarPessoa(dados: Omit<Person, "id" | "criadoEm">): Promise<string> {
-  // Duas coisas não moram no documento da pessoa: as características, que são
-  // avaliação da direção, e o contato, que o elenco inteiro não precisa ler.
-  const { caracteristicas, contato, ...doDocumento } = dados;
+  // Três coisas não moram no documento da pessoa: as características, que são
+  // avaliação da direção, o contato e o e-mail, que o elenco não precisa ler.
+  const { caracteristicas, contato, email, ...doDocumento } = dados;
   const ref = doc(collection(db, "people"));
-  await setDoc(ref, {
-    ...doDocumento,
-    email: dados.email.toLowerCase(),
-    criadoEm: new Date().toISOString(),
-  });
+  await setDoc(ref, { ...doDocumento, criadoEm: new Date().toISOString() });
   if (caracteristicas?.length) await definirCaracteristicasDaPessoa(ref.id, caracteristicas);
-  if (contato) await salvarContato(ref.id, contato);
+  const privado = { ...contato, ...(email ? { email: email.toLowerCase() } : {}) };
+  if (Object.keys(privado).length > 0) await salvarContato(ref.id, privado);
   return ref.id;
 }
 
@@ -205,11 +202,17 @@ export async function atualizarPessoa(id: string, dados: Partial<Person>): Promi
   // Desviada para o documento da direção, nunca para o da pessoa.
   const caracteristicas = limpo.caracteristicas;
   delete limpo.caracteristicas;
-  // Desviado para `privado/contato`, que só a direção e a própria pessoa leem.
-  const contato = limpo.contato;
+  /*
+   * Desviados para `privado/contato`, que só a direção e a própria pessoa
+   * leem. O e-mail vem solto em `dados` por comodidade de quem chama — a tela
+   * tem um campo "E-mail", não um campo "contato.email" —, e é aqui que ele
+   * encontra o resto do contato.
+   */
+  const contato = { ...limpo.contato };
   delete limpo.contato;
-  if (contato) await salvarContato(id, contato);
-  if (typeof limpo.email === "string") limpo.email = limpo.email.toLowerCase();
+  if (typeof limpo.email === "string") contato.email = limpo.email.toLowerCase();
+  delete limpo.email;
+  if (Object.keys(contato).length > 0) await salvarContato(id, contato);
   if (Object.keys(limpo).length > 0) await updateDoc(doc(db, "people", id), limpo);
   if (caracteristicas) await definirCaracteristicasDaPessoa(id, caracteristicas);
 }
@@ -236,8 +239,16 @@ export async function completarCadastro(
   personId: string,
   dados: CadastroDaPessoa,
 ): Promise<void> {
-  const { telefone, nascimento, responsavelNome, responsavelTelefone, ...naFicha } = dados;
+  /*
+   * `email` sai daqui junto com o resto do contato.
+   *
+   * O que não for destrinchado aqui cai em `naFicha` e vai para o documento
+   * que todo o elenco lê — então esta linha é o que separa os dois destinos, e
+   * esquecer um campo nela é recolocá-lo em público sem ninguém notar.
+   */
+  const { email, telefone, nascimento, responsavelNome, responsavelTelefone, ...naFicha } = dados;
   await salvarContato(personId, {
+    email,
     telefone,
     nascimento,
     responsavelNome,
@@ -439,12 +450,29 @@ export async function salvarContato(
   personId: string,
   dados: Partial<ContatoPessoal>,
 ): Promise<void> {
-  await setDoc(refDoContato(personId), dados, { merge: true });
+  /*
+   * Campo ausente é ausente, não é `undefined`.
+   *
+   * O Firestore recusa `undefined` com exceção (o projeto não liga
+   * `ignoreUndefinedProperties`, de propósito: gravar silenciosamente um campo
+   * que virou `undefined` por engano é pior que o erro). Quem chama monta o
+   * objeto com todos os campos possíveis e deixa de fora os que não tem, então
+   * a limpeza mora aqui — e, com `merge`, deixar de fora preserva o que já
+   * estava gravado.
+   */
+  const preenchidos = Object.fromEntries(
+    Object.entries(dados).filter(([, valor]) => valor !== undefined),
+  );
+  if (Object.keys(preenchidos).length === 0) return;
+  await setDoc(refDoContato(personId), preenchidos, { merge: true });
 }
 
 /** Junta a ficha com o contato, para a tela receber tudo num objeto só. */
 export async function comContato(pessoa: Person): Promise<Person> {
-  return { ...pessoa, contato: await buscarContato(pessoa.id) };
+  const contato = await buscarContato(pessoa.id);
+  // `email` sobe um nível: as telas o tratam como campo da pessoa, e era ali
+  // que ele morava antes de sair da ficha pública.
+  return { ...pessoa, contato, email: contato.email ?? "" };
 }
 
 /* --------------------------------------------------------- características */
@@ -1082,7 +1110,26 @@ export async function atualizarEnsaio(id: string, dados: Partial<Rehearsal>): Pr
   await updateDoc(doc(db, "rehearsals", id), limpo);
 }
 
+/**
+ * Apaga o ensaio e as presenças que estavam embaixo dele.
+ *
+ * Apagar um documento no Firestore **não** apaga a subcoleção dele: as
+ * presenças continuavam existindo em `rehearsals/{id}/presencas/*`, presas a
+ * um ensaio que ninguém mais consegue abrir. Não apareciam em lugar nenhum e
+ * não tinham como ser apagadas depois, porque o caminho até elas passa pelo id
+ * de um ensaio que sumiu da lista.
+ *
+ * As presenças vão primeiro, o ensaio por último. Na ordem inversa, uma falha
+ * no meio deixaria exatamente os órfãos que isto existe para evitar; nesta,
+ * deixa um ensaio sem presenças, que é visível e refazível.
+ */
 export async function removerEnsaio(id: string): Promise<void> {
+  const presencas = await getDocs(collection(db, "rehearsals", id, "presencas"));
+  if (!presencas.empty) {
+    const lote = writeBatch(db);
+    presencas.docs.forEach((presenca) => lote.delete(presenca.ref));
+    await lote.commit();
+  }
   await deleteDoc(doc(db, "rehearsals", id));
 }
 

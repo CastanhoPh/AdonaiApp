@@ -109,7 +109,14 @@ function ConteudoPerfil() {
       // Mesclado aqui: o documento da pessoa não guarda mais a avaliação.
       // O contato pessoal mora fora da ficha; a direção precisa dele aqui.
       pessoa: pessoa
-        ? { ...pessoa, caracteristicas: atribuidas.pessoas[id] ?? [], contato }
+        ? {
+            ...pessoa,
+            caracteristicas: atribuidas.pessoas[id] ?? [],
+            contato,
+            // Sobe um nível, como em `comContato`: as telas tratam o e-mail
+            // como campo da pessoa, e era ali que ele morava.
+            email: contato.email ?? "",
+          }
         : null,
       peca,
       personagens,
@@ -144,7 +151,7 @@ function ConteudoPerfil() {
     if (!pessoa) return;
     setForm({
       nome: pessoa.nome,
-      email: pessoa.email,
+      email: pessoa.email ?? "",
       telefone: pessoa.contato?.telefone ?? "",
       fotoUrl: pessoa.fotoUrl ?? "",
       ativo: pessoa.ativo,

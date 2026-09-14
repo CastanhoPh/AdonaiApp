@@ -94,7 +94,7 @@ if (aplicar && faltando.length > 0) {
      * e pessoa do acervo entra sem acesso. A ativação acontece ao
      * vincular a conta, em Pessoas.
      */
-    lote.set(ref, { nome, email: "", telefone: "", fotoUrl: "", ativo: false, criadoEm: agora });
+    lote.set(ref, { nome, fotoUrl: "", ativo: false, criadoEm: agora });
     idPorNome.set(normalizar(nome), ref.id);
   }
   await lote.commit();

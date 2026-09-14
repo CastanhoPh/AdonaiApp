@@ -324,10 +324,19 @@ ninguém percebe o que ficou faltando.
 ## O que é pessoal não fica na ficha
 
 `people` é lido por todo o elenco — a lista de elenco precisa de nome e foto.
-Então **telefone, data de nascimento e o contato do responsável não moram
-ali**: ficam em `people/{id}/privado/contato`, que só a direção e a própria
-pessoa leem. Antes disso, o telefone do responsável de uma menor de idade
-estava à vista de qualquer um com conta.
+Então **e-mail, telefone, data de nascimento e o contato do responsável não
+moram ali**: ficam em `people/{id}/privado/contato`, que só a direção e a
+própria pessoa leem. Antes disso, o telefone do responsável de uma menor de
+idade estava à vista de qualquer um com conta.
+
+O e-mail foi o último a sair, e ficou para trás por um motivo que deixou de
+valer: o app ligava conta nova à pessoa cadastrada com o mesmo endereço. Esse
+vínculo automático não existe mais — a direção liga à mão, e o convite já vem
+ligado —, então ele era só o endereço de todo mundo à vista de todo mundo.
+
+Dentro do contato ele é o único campo que a **pessoa não escreve**: é por ele
+que a direção reconhece quem é quem ao ligar uma conta a uma ficha, e deixar a
+própria pessoa reescrevê-lo seria dar a ela como a direção a identifica.
 
 O que sobrou na ficha pública é o que a lista de elenco mostra de fato: nome,
 foto, situação no grupo, experiência e as peças anteriores. As regras do
@@ -412,11 +421,12 @@ pasta sincronizada — esta aqui está no OneDrive.
 | `plays/{id}/characters/{id}`         | personagem e pessoa escalada                   | todo o elenco |
 | `plays/{id}/lines/{id}`              | linha do roteiro: ato, cena, tipo, personagem, texto | todo o elenco |
 | `rehearsals/{id}`                    | ensaio: data, horário, local, convocados, status | todo o elenco |
-| `rehearsals/{id}/presencas/{personId}` | confirmação de presença, uma por pessoa      | todo o elenco |
+| `rehearsals/{id}/presencas/{personId}` | confirmação de presença, uma por pessoa — apagadas junto com o ensaio | todo o elenco |
 | `participations/{id}`                | histórico, criado quando a peça é concluída    | todo o elenco |
 | `exercicios/{id}`                    | exercício de teatro: nome, objetivo, link, ordem | todo o elenco |
 | `avisos/{id}`                        | aviso composto pela direção e o resultado da entrega | só a direção |
 | `convites/{codigo}`                  | convite de primeiro acesso, ligado a uma ficha | **ninguém pelo cliente** — só a direção escreve, e a função lê |
+| `limites/{chave}`                    | tentativas por origem nas funções abertas      | **ninguém pelo cliente** — só o servidor |
 
 Datas de ensaio e apresentação são guardadas como texto `AAAA-MM-DD`, o que
 evita erros de fuso horário e mantém a ordenação simples.
@@ -584,6 +594,15 @@ Firestore consegue conferir "esta pessoa apresentou um código válido", porque
 conferir o código exige ler um documento que quem ainda não tem conta não pode
 ler. Com a função no meio, `convites` fica fechada para todos menos a direção.
 
+São também as únicas funções abertas a quem não tem conta, e a primeira
+responde se um código existe — um oráculo para quem quiser varrer. Por isso
+contam tentativas por origem em `limites/{chave}`: 30 conferências por 10
+minutos e 10 resgates por hora, folgado para gente de verdade (quem digita
+errado tenta duas ou três vezes) e inviável para varredura. A chave é o resumo
+do IP, não o IP — contar tentativas não exige guardar o endereço de quem nem
+conta tem. A coleção é fechada ao cliente: quem alcançasse o contador zeraria o
+próprio limite.
+
 `sincronizarClaims` espelha `role` e `personId` no token porque as regras do
 Storage precisam saber de quem é a pasta para deixar a pessoa trocar a própria
 foto. A alternativa — a regra consultar o Firestore a cada envio — custaria uma
@@ -684,7 +703,7 @@ Quatro verificações, em ordem de custo:
 | | O que confere |
 | --- | --- |
 | `dados` | o que aponta para o que: escalação, histórico, contas, claims, convites, e se algum campo pessoal voltou para a ficha pública |
-| `permissoes` | 29 linhas de "um participante pode/não pode", no Firestore e no Storage |
+| `permissoes` | 36 linhas de "um participante pode/não pode", no Firestore e no Storage — incluindo o que ele **deve** conseguir gravar |
 | `imagens` | toda URL guardada responde, toda imagem tem versão pequena, e a lista baixa a pequena |
 | `telas` | abre as 22 telas nos dois papéis e escuta erro de console, exceção, tela vazia e desvio |
 
@@ -756,8 +775,13 @@ estático (`output: "export"` em [`next.config.ts`](next.config.ts)) e servido
 pelo Firebase Hosting — sem servidor de renderização.
 
 ```bash
-npm run deploy     # next build && firebase deploy --only hosting
+npm run deploy     # build, publica e verifica
 ```
+
+A verificação roda **depois** de publicar, de propósito: metade do que ela
+confere (as telas, o peso das listas, as permissões contra as regras no ar) só
+existe depois da publicação. Ela não impede um deploy ruim de sair; ela avisa,
+com código de saída, que saiu.
 
 Regras e funções publicam à parte, porque mudam em ritmo próprio:
 
@@ -789,12 +813,13 @@ e relatórios.
 
 Fora do briefing, o que o projeto deve a si mesmo:
 
-- A verificação (`npm run verificar`) cobre dados, permissões, imagens e a
-  abertura de todas as telas. **Não cobre fluxo com gravação** — criar peça,
-  escalar alguém, publicar roteiro, resgatar convite. Isso continua conferido à
-  mão, porque testar gravação exige um lugar para gravar que não seja a
-  produção.
-- Ensaio apagado não limpa as presenças que ficaram embaixo dele.
-- As funções de convite não têm limite de tentativa. O código tem 8 caracteres
-  e vale 7 dias, então adivinhar é caro, mas o teto não existe.
-- O `email` continua legível na ficha que todo o elenco lê.
+- A verificação cobre o que o participante grava na própria ficha, mas **não
+  os fluxos da direção** — criar peça, escalar alguém, publicar roteiro,
+  concluir, resgatar convite. Esses continuam conferidos à mão, porque exercer
+  gravação de verdade exige um lugar para gravar que não seja a produção: ou o
+  emulador do Firestore (que precisa de Java instalado), ou um segundo projeto
+  Firebase só para teste.
+- A contagem de tentativas em `limites` não é varrida sozinha. Os documentos
+  carregam `expiraEm` para uma política de TTL do Firestore cuidar disso; a
+  política ainda não foi criada no console. São poucos documentos (um por
+  origem), então é arrumação, não problema.

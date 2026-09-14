@@ -74,20 +74,39 @@ export async function provisionarConta({ role }) {
   const nome = nomeInformado || usuario.displayName || email.split("@")[0];
 
   // --------------------------------------------------------------- people
-  const pessoas = await db.collection("people").where("email", "==", email).limit(1).get();
-  let personId = pessoas.empty ? null : pessoas.docs[0].id;
+  /*
+   * A ficha é procurada por uma conta já ligada, e só depois pelo e-mail.
+   *
+   * O e-mail saiu de `people` e mora em `privado/contato`, que não dá para
+   * consultar por campo — é um documento por pessoa, não uma coleção. Então a
+   * busca por e-mail lê os contatos um a um. São dezenas de fichas e este
+   * script roda de vez em quando; se um dia forem milhares, o caminho é um
+   * índice próprio, não trazer o endereço de volta para a ficha pública.
+   */
+  let personId = null;
+  const contaLigada = await db.collection("users").doc(usuario.uid).get();
+  if (contaLigada.exists && contaLigada.data().personId) {
+    personId = contaLigada.data().personId;
+  } else {
+    for (const pessoa of (await db.collection("people").get()).docs) {
+      const contato = await pessoa.ref.collection("privado").doc("contato").get();
+      if (contato.data()?.email === email) {
+        personId = pessoa.id;
+        break;
+      }
+    }
+  }
 
   if (!personId) {
     const referencia = db.collection("people").doc();
     await referencia.set({
       nome,
-      email,
-      telefone: "",
       fotoUrl: "",
       ativo: true,
-      caracteristicas: [],
       criadoEm: new Date().toISOString(),
     });
+    // Fora da ficha: `people` é lido por todo o elenco.
+    await referencia.collection("privado").doc("contato").set({ email }, { merge: true });
     personId = referencia.id;
     console.log(`  Cadastro criado em people/${personId}`);
   } else {

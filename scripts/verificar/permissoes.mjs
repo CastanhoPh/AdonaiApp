@@ -121,7 +121,18 @@ export async function rodar() {
   await checar("apontar a própria conta para outra ficha", "negado", gravar(`users/${conta.uid}`, { personId: texto(outraPessoa) }));
   await checar("renomear outra pessoa", "negado", gravar(`people/${outraPessoa}`, { nome: texto(inedito()) }));
   await checar("pôr telefone de volta na ficha", "negado", gravar(`people/${eu}`, { telefone: texto("11999999999") }));
-  await checar("mexer no próprio e-mail da ficha", "negado", gravar(`people/${eu}`, { email: texto(`${inedito()}@exemplo.com`) }));
+  await checar("pôr e-mail de volta na ficha", "negado", gravar(`people/${eu}`, { email: texto(`${inedito()}@exemplo.com`) }));
+  /*
+   * O e-mail mora no contato privado, que a pessoa escreve — menos este campo.
+   * É por ele que a direção sabe quem é quem ao ligar conta e ficha.
+   */
+  await checar(
+    "trocar o próprio e-mail no contato",
+    "negado",
+    gravar(`people/${eu}/privado/contato`, { email: texto(`${inedito()}@exemplo.com`) }),
+  );
+  await checar("ler observações da direção sobre outra pessoa", "negado", ler(`people/${outraPessoa}/privado/direcao`));
+  await checar("ler a contagem de tentativas do convite", "negado", listar("limites"));
   await checar("criar exercício", "negado", gravar(`exercicios/${inedito()}`, { nome: texto("x") }));
   await checar("criar convite", "negado", gravar(`convites/${inedito()}`, { codigo: texto("x") }));
   await checar("criar aviso", "negado", gravar(`avisos/${inedito()}`, { titulo: texto("x") }));
@@ -141,6 +152,64 @@ export async function rodar() {
       "mudar a própria situação no grupo",
       "negado",
       gravar(`people/${eu}`, { ativo: logico(antes.ativo === false) }),
+    );
+  });
+
+  /* ------------------------------------------------- o que ela PODE gravar */
+  /*
+   * A direção contrária, e a que engana.
+   *
+   * Regra apertada demais não aparece como erro: o Firestore recusa a
+   * gravação inteira, a tela não reclama, e o dado simplesmente não muda. Foi
+   * assim que a troca de foto quebrou. Aqui os valores são de verdade
+   * diferentes — gravação que repete o que já estava passaria sem exercer
+   * regra nenhuma — e são devolvidos ao original em seguida.
+   */
+  await comRestauracao(fichaRef, ["nome"], async (antes) => {
+    await checar(
+      "mudar o próprio nome",
+      "pode",
+      gravar(`people/${eu}`, { nome: texto(`${antes.nome} ${inedito()}`) }),
+    );
+  });
+
+  await comRestauracao(fichaRef, ["jaAtuou", "experiencia", "pecasAnteriores"], async (antes) => {
+    await checar(
+      "responder o cadastro de primeiro acesso",
+      "pode",
+      gravar(`people/${eu}`, {
+        jaAtuou: logico(antes.jaAtuou !== true),
+        experiencia: texto(antes.experiencia === "1 a 2" ? "3 a 5" : "1 a 2"),
+        pecasAnteriores: texto(antes.pecasAnteriores === "1" ? "2 a 3" : "1"),
+      }),
+    );
+  });
+
+  /*
+   * Foto e miniatura na mesma gravação, que é como o app envia.
+   *
+   * Separadas passariam mesmo com a lista incompleta; juntas é que a lista é
+   * exercida — e era exatamente a miniatura que faltava nela.
+   */
+  await comRestauracao(fichaRef, ["fotoUrl", "fotoMiniUrl"], async (antes) => {
+    await checar(
+      "trocar a própria foto (grande e miniatura juntas)",
+      "pode",
+      gravar(`people/${eu}`, {
+        fotoUrl: texto(`${antes.fotoUrl ?? ""}#${inedito()}`),
+        fotoMiniUrl: texto(`${antes.fotoMiniUrl ?? ""}#${inedito()}`),
+      }),
+    );
+  });
+
+  const contatoRef = fichaRef.collection("privado").doc("contato");
+  await comRestauracao(contatoRef, ["telefone"], async (antes) => {
+    await checar(
+      "gravar o próprio telefone",
+      "pode",
+      gravar(`people/${eu}/privado/contato`, {
+        telefone: texto(antes.telefone === "11999999999" ? "11888888888" : "11999999999"),
+      }),
     );
   });
 

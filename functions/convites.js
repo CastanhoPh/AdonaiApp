@@ -12,6 +12,7 @@
  * Com a função no meio, a coleção `convites` fica fechada para todo mundo
  * menos a direção, e o código nunca é exposto a uma consulta.
  */
+import { createHash } from "node:crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -74,6 +75,76 @@ async function lerConvite(db, codigo) {
   return { ref, convite, pessoa };
 }
 
+/*
+ * Quantas tentativas cada origem tem, e em quanto tempo.
+ *
+ * Estas duas funções são as únicas do app abertas a quem não tem conta, e a
+ * primeira responde se um código existe — o que é um oráculo para quem quiser
+ * varrer. Adivinhar são 25^8 combinações e o convite vence em 7 dias, então
+ * força bruta já era cara; o teto torna a varredura inviável em vez de apenas
+ * cara, e protege a fatura, que é o recurso que de fato acaba.
+ *
+ * Os números são folgados para gente de verdade: quem digita errado tenta duas
+ * ou três vezes, não trinta.
+ */
+const LIMITES = {
+  conferir: { tentativas: 30, janelaMs: 10 * 60 * 1000 },
+  resgatar: { tentativas: 10, janelaMs: 60 * 60 * 1000 },
+};
+
+/**
+ * De onde veio a chamada, como identificador curto e sem o endereço em claro.
+ *
+ * Guardar IP de visitante é guardar dado pessoal de quem nem conta tem; o
+ * resumo serve igual para contar tentativas e não serve para nada além disso.
+ * Sem IP (chamada interna, teste), cai numa chave comum — pior é não limitar.
+ */
+function origem(requisicao) {
+  const ip = requisicao.rawRequest?.ip ?? "";
+  if (!ip) return "sem-origem";
+  return createHash("sha256").update(ip).digest("hex").slice(0, 32);
+}
+
+/**
+ * Conta a tentativa e diz se ela cabe na janela.
+ *
+ * Transação porque duas chamadas simultâneas da mesma origem leriam o mesmo
+ * número e gravariam o mesmo incremento — que é justamente o que alguém
+ * tentando varrer faria.
+ *
+ * A janela é fixa, não deslizante: passados os minutos, a contagem recomeça do
+ * zero. Deslizante seria mais justo e exigiria guardar cada tentativa; para
+ * conter varredura, o balde simples basta.
+ */
+async function cabeMaisUma(db, chave, { tentativas, janelaMs }) {
+  const ref = db.collection("limites").doc(chave);
+  const agora = Date.now();
+  return db.runTransaction(async (transacao) => {
+    const atual = (await transacao.get(ref)).data();
+    const mesmaJanela = atual && agora - atual.desde < janelaMs;
+    const desde = mesmaJanela ? atual.desde : agora;
+    const contagem = (mesmaJanela ? atual.contagem : 0) + 1;
+    transacao.set(ref, {
+      desde,
+      contagem,
+      // Para uma política de TTL do Firestore varrer isto sozinha.
+      expiraEm: new Date(desde + janelaMs),
+    });
+    return contagem <= tentativas;
+  });
+}
+
+/** Aplica o limite ou recusa. A mensagem não diz qual é o teto, de propósito. */
+async function conterAbuso(db, requisicao, qual) {
+  const chave = `${qual}-${origem(requisicao)}`;
+  if (await cabeMaisUma(db, chave, LIMITES[qual])) return;
+  logger.warn("limite de tentativas atingido", { qual, chave });
+  throw new HttpsError(
+    "resource-exhausted",
+    "Muitas tentativas. Espere alguns minutos e tente de novo.",
+  );
+}
+
 const COMUM = { region: "southamerica-east1", maxInstances: 5, memory: "256MiB" };
 
 /**
@@ -86,9 +157,12 @@ const COMUM = { region: "southamerica-east1", maxInstances: 5, memory: "256MiB" 
  */
 export const conferirConvite = onCall(COMUM, async (requisicao) => {
   const db = getFirestore();
+  await conterAbuso(db, requisicao, "conferir");
   const codigo = normalizarCodigo(requisicao.data?.codigo);
   const { pessoa } = await lerConvite(db, codigo);
-  return { nome: pessoa.data().nome ?? "", email: pessoa.data().email ?? "" };
+  // Só o nome. O e-mail também vinha aqui, sem ninguém usar, e entregava o
+  // endereço de alguém a qualquer um com o código na mão.
+  return { nome: pessoa.data().nome ?? "" };
 });
 
 /**
@@ -101,6 +175,7 @@ export const conferirConvite = onCall(COMUM, async (requisicao) => {
  */
 export const resgatarConvite = onCall(COMUM, async (requisicao) => {
   const db = getFirestore();
+  await conterAbuso(db, requisicao, "resgatar");
   const dados = requisicao.data ?? {};
   const codigo = normalizarCodigo(dados.codigo);
   const nome = String(dados.nome ?? "")
@@ -179,7 +254,6 @@ export const resgatarConvite = onCall(COMUM, async (requisicao) => {
 
       transacao.update(pessoa.ref, {
         nome,
-        email,
         /*
          * Ativa. É o inverso da regra que deixa inativa quem não tem acesso:
          * sem isto a pessoa entraria no app e continuaria fora da convocação
@@ -187,6 +261,19 @@ export const resgatarConvite = onCall(COMUM, async (requisicao) => {
          */
         ativo: true,
       });
+
+      /*
+       * O e-mail vai para o contato privado, não para a ficha.
+       *
+       * `people` é lido por todo o elenco. Gravar o endereço ali recolocaria
+       * em público exatamente o que foi tirado de lá — e por uma função, que é
+       * onde ninguém olharia procurando o vazamento.
+       */
+      transacao.set(
+        pessoa.ref.collection("privado").doc("contato"),
+        { email },
+        { merge: true },
+      );
 
       copiasDoNome.forEach((copia) => transacao.update(copia, { personNome: nome }));
       transacao.update(ref, { usadoEm: agora, usadoPor: usuario.uid });

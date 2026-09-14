@@ -7,9 +7,11 @@ rules_version = '2';
 //  - Participantes leem os dados da produção e editam apenas telefone e foto
 //    do próprio cadastro.
 //  - `people` é lido por todo o elenco, porque a lista de elenco precisa de
-//    nome e foto. Por isso o que é pessoal — telefone, nascimento e o contato
-//    do responsável — não mora ali: fica em `people/{id}/privado/contato`,
-//    que só a direção e a própria pessoa leem.
+//    nome e foto. Por isso o que é pessoal — e-mail, telefone, nascimento e o
+//    contato do responsável — não mora ali: fica em
+//    `people/{id}/privado/contato`, que só a direção e a própria pessoa leem.
+//    Dentro dele, o e-mail é o único campo que a pessoa não escreve: é por ele
+//    que a direção reconhece quem é quem ao ligar uma conta a uma ficha.
 //  - As observações internas da direção ficam em `people/{id}/privado/*`, e as
 //    características de atuação em `direcao/caracteristicas` — ambas fora do
 //    alcance dos participantes, que leem `people` e `characters`.
@@ -74,11 +76,11 @@ service cloud.firestore {
       allow get, list: if autenticado();
       allow create, delete: if ehAdmin();
       // A pessoa mantém os próprios dados e responde o cadastro de primeiro
-      // acesso. Fora desta lista nada muda: e-mail é o vínculo com a conta,
-      // `ativo` é decisão do grupo e `caracteristicas` é avaliação da direção.
+      // acesso. Fora desta lista nada muda: `ativo` é decisão do grupo e
+      // `caracteristicas` é avaliação da direção.
       //
-      // Telefone, nascimento e responsável saíram desta lista: agora moram em
-      // `privado/contato`. Aqui ficou o que a lista de elenco mostra de fato.
+      // Telefone, nascimento, responsável e e-mail saíram desta lista: agora
+      // moram em `privado/contato`. Aqui ficou o que a lista de elenco mostra.
       allow update: if ehAdmin()
         || (temConta()
             && conta().personId == personId
@@ -105,7 +107,38 @@ service cloud.firestore {
          * quem é o responsável. Qualquer outro documento aqui — as observações
          * internas — segue exclusivo da direção.
          */
-        allow read, write: if ehAdmin() || (documento == 'contato' && ehAPropriaPessoa());
+        allow read: if ehAdmin() || (documento == 'contato' && ehAPropriaPessoa());
+
+        /*
+         * O e-mail mora aqui mas continua sendo da direção.
+         *
+         * Ele saiu da ficha pública porque ninguém precisa do endereço de todo
+         * mundo, não porque virou campo editável: é por ele que a direção
+         * reconhece quem é quem ao ligar uma conta a uma ficha. Deixar a
+         * própria pessoa reescrevê-lo daria a ela como a direção a identifica.
+         *
+         * Criar e alterar são separados porque `resource` não existe antes do
+         * primeiro documento — `diff` contra nada é erro, e erro aqui é
+         * recusa: o cadastro de primeiro acesso, que é justamente quem cria
+         * este documento, pararia de gravar.
+         *
+         * Na alteração, `hasAny` olha se a gravação mexeu na chave, não o
+         * valor. Regravar o mesmo e-mail não afeta chave nenhuma e passa — e
+         * está certo, porque não mudou nada.
+         */
+        allow create: if ehAdmin()
+          || (documento == 'contato'
+              && ehAPropriaPessoa()
+              && !('email' in request.resource.data));
+
+        allow update: if ehAdmin()
+          || (documento == 'contato'
+              && ehAPropriaPessoa()
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']));
+
+        // Apagar o contato é da direção. Nenhuma tela do participante faz
+        // isso, e perder telefone e responsável por engano não tem volta.
+        allow delete: if ehAdmin();
       }
     }
 
@@ -191,6 +224,17 @@ service cloud.firestore {
     // credencial de servidor, que não passa por estas regras — por isso quem
     // ainda não tem conta não precisa de leitura nenhuma aqui, e o código não
     // fica exposto a quem sabe consultar a coleção.
+    /*
+     * Contagem de tentativas das funções abertas (conferir e resgatar
+     * convite). Só o servidor escreve e lê — nenhuma tela precisa disso, e
+     * deixar o cliente alcançar o contador seria deixá-lo zerar o próprio
+     * limite. Sem `allow`, o Firestore recusa por padrão; o bloco existe para
+     * isso ficar dito e não parecer esquecimento.
+     */
+    match /limites/{chave} {
+      allow read, write: if false;
+    }
+
     match /convites/{codigo} {
       allow get, list: if ehAdmin();
       // Só `create`: um código nunca é reescrito. Se o sorteio repetir um

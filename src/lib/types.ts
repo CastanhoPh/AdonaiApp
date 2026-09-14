@@ -105,6 +105,16 @@ export const MAIORIDADE = 18;
  * listas de elenco ele nem é buscado.
  */
 export interface ContatoPessoal {
+  /**
+   * O e-mail da pessoa.
+   *
+   * Saiu da ficha pública junto com o resto do contato. Ele ficou lá mais
+   * tempo porque servia para o app ligar conta nova à pessoa cadastrada com o
+   * mesmo endereço — mas esse vínculo automático deixou de existir (a direção
+   * liga à mão, ou o convite já vem ligado), e então ele passou a ser só o
+   * endereço de todo mundo à vista de todo mundo.
+   */
+  email?: string;
   telefone: string;
   /**
    * Data de nascimento, `AAAA-MM-DD`. Guardamos a data e não a idade: idade
@@ -118,7 +128,11 @@ export interface ContatoPessoal {
 export interface Person {
   id: string;
   nome: string;
-  email: string;
+  /**
+   * Mesclado de `privado/contato`, como o telefone — não está no documento da
+   * pessoa. Ausente nas listas de elenco, que não o buscam.
+   */
+  email?: string;
   fotoUrl: string;
   /**
    * A mesma foto, pequena, para os círculos das listas.

@@ -15,8 +15,8 @@ import app from "./firebase";
 const funcoes = getFunctions(app, "southamerica-east1");
 
 export interface ConviteConferido {
+  /** Só o nome: é o que a tela mostra para a pessoa confirmar quem ela é. */
   nome: string;
-  email: string;
 }
 
 export async function conferirConvite(codigo: string): Promise<ConviteConferido> {

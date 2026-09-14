@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build && node scripts/corrigir-segmentos.mjs",
     "preview": "firebase emulators:start --only hosting",
-    "deploy": "npm run build && firebase deploy --only hosting",
+    "deploy": "npm run build && firebase deploy --only hosting && npm run verificar",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "verificar": "node scripts/verificar/index.mjs",

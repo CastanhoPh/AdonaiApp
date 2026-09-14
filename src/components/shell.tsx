@@ -354,12 +354,22 @@ export function TopoInicio({ saudacao, nome }: { saudacao: string; nome: string 
   return (
     <MolduraTopo>
       <Avatar nome={nome} url={pessoa?.fotoUrl} mini={pessoa?.fotoMiniUrl} tamanho={40} />
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] leading-[18px] text-ink-caption">{saudacao},</p>
-        <p className="truncate text-[16px] leading-6 font-bold text-ink-heading">
+      {/*
+        * A saudação é o título desta tela, então é ela o `h1`.
+        *
+        * As outras abas têm um `h1` visível ("Roteiro", "Ensaios"); o Início
+        * não tinha nenhum, e uma página sem título de primeiro nível deixa
+        * quem navega por leitor de tela sem o ponto de partida da página. As
+        * duas linhas continuam com o desenho de antes, dentro do mesmo título.
+        */}
+      <h1 className="min-w-0 flex-1">
+        <span className="block text-[12px] leading-[18px] font-normal text-ink-caption">
+          {saudacao},
+        </span>
+        <span className="block truncate text-[16px] leading-6 font-bold text-ink-heading">
           {nomeCurto(pessoa?.nome ?? conta?.nome ?? nome)}
-        </p>
-      </div>
+        </span>
+      </h1>
       <MarcaAlianca tamanho={26} opacidade={0.5} />
     </MolduraTopo>
   );

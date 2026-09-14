@@ -138,6 +138,20 @@ export default function Pessoas() {
     }
     return ids;
   }, [dados.dados]);
+
+  /**
+   * Quem ainda não tem conta, e por isso não vê nada do app.
+   *
+   * Ocupou o lugar do aviso "sem e-mail", que apontava para o vínculo
+   * automático por coincidência de e-mail — coisa que o app não faz mais. Sem
+   * acesso é o estado que de fato pede ação da direção: gerar um convite.
+   */
+  const semAcesso = useMemo(() => {
+    const comConta = new Set(
+      (dados.dados?.contas ?? []).map((c) => c.personId).filter(Boolean) as string[],
+    );
+    return (id: string) => !comConta.has(id);
+  }, [dados.dados]);
   const personagens = useMemo(() => dados.dados?.personagens ?? [], [dados.dados]);
   const participacoes = useMemo(() => dados.dados?.participacoes ?? [], [dados.dados]);
 
@@ -450,11 +464,11 @@ export default function Pessoas() {
                               {/* Quem administra o app. Vem da conta, não da ficha. */}
                               {ehDirecao.has(pessoa.id) ? <Tag tom="areia">Direção</Tag> : null}
                               {/*
-                                * Sem e-mail a pessoa nunca será encontrada
-                                * quando criar a conta. Precisa ficar à vista,
-                                * senão o vínculo não acontece por esquecimento.
+                                * Sem conta, a pessoa não vê nada do app. Fica
+                                * à vista porque é o que pede ação: gerar um
+                                * convite na ficha dela.
                                 */}
-                              {!pessoa.email ? <Tag tom="aviso">Sem e-mail</Tag> : null}
+                              {semAcesso(pessoa.id) ? <Tag tom="aviso">Sem acesso</Tag> : null}
                             </span>
                           </div>
                         );
@@ -487,7 +501,7 @@ export default function Pessoas() {
                                     {pessoa.ativo ? "Ativo" : "Inativo"}
                                   </Status>
                                   {ehDirecao.has(pessoa.id) ? <Tag tom="areia">Direção</Tag> : null}
-                                  {!pessoa.email ? <Tag tom="aviso">Sem e-mail</Tag> : null}
+                                  {semAcesso(pessoa.id) ? <Tag tom="aviso">Sem acesso</Tag> : null}
                                   {marcadas.map((t) => (
                                     <Tag key={t.id} tom="info">
                                       {t.nome}

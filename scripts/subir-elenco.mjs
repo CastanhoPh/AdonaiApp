@@ -162,7 +162,6 @@ if (aplicar && aCriar.length > 0) {
     lote.set(ref, {
       nome,
       // Sem e-mail: vem depois, e é ele que liga a conta quando a pessoa criar.
-      email: "",
       telefone: "",
       fotoUrl: "",
       // Inativa até ter acesso vinculado; ver inativar-sem-acesso.mjs.

@@ -12,7 +12,7 @@ import { criarCaderno } from "./relatorio.mjs";
 const comId = (d) => ({ id: d.id, ...d.data() });
 
 /** Campos que **não** podem estar na ficha pública. Ver `privado/contato`. */
-const PESSOAIS = ["telefone", "nascimento", "responsavelNome", "responsavelTelefone"];
+const PESSOAIS = ["email", "telefone", "nascimento", "responsavelNome", "responsavelTelefone"];
 
 export const nome = "dados";
 export const titulo = "Integridade do banco";
