@@ -28,7 +28,11 @@ import {
   type Play,
   type Trait,
 } from "@/lib/types";
-import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
+import {
+  LADO_MINIATURA,
+  caminhoDaFotoDoAtor,
+  caminhoDaMiniaturaDoAtor,
+} from "@/lib/armazenamento";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin, VoltarPara } from "@/components/shell";
 import { EnviarFoto } from "@/components/comum/enviar-foto";
 import { AcessoDaPessoa } from "@/components/admin/vincular-acessos";
@@ -150,10 +154,11 @@ function ConteudoPerfil() {
   }
 
   /** Foto vai direto para o cadastro; o resto do formulário espera o Salvar. */
-  async function salvarFoto(url: string) {
+  async function salvarFoto(url: string, miniUrl = "") {
     setForm({ ...form, fotoUrl: url });
     await enviar(async () => {
-      await atualizarPessoa(id, { fotoUrl: url });
+      // As duas juntas: a grande para a ficha, a pequena para os círculos.
+      await atualizarPessoa(id, { fotoUrl: url, fotoMiniUrl: miniUrl });
       await dados.recarregar();
     });
   }
@@ -283,7 +288,7 @@ function ConteudoPerfil() {
         <VoltarPara href="/admin/pessoas" rotulo="Pessoas" />
 
         <div className="mb-5 flex flex-wrap items-center gap-3.5">
-          <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} tamanho={40} />
+          <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} mini={pessoa.fotoMiniUrl} tamanho={40} />
           <Status tom={pessoa.ativo ? "positivo" : "neutro"}>
             {pessoa.ativo ? "Ativa no grupo" : "Inativa no grupo"}
           </Status>
@@ -340,9 +345,10 @@ function ConteudoPerfil() {
                   */}
                 <EnviarFoto
                   caminho={caminhoDaFotoDoAtor(id)}
+                  miniatura={{ caminho: caminhoDaMiniaturaDoAtor(id), lado: LADO_MINIATURA }}
                   atual={form.fotoUrl}
-                  onEnviada={(url) => salvarFoto(url)}
-                  onRemovida={() => salvarFoto("")}
+                  onEnviada={(url, miniUrl) => salvarFoto(url, miniUrl)}
+                  onRemovida={() => salvarFoto("", "")}
                   desabilitado={enviando}
                 />
               </Campo>

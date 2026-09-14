@@ -34,6 +34,18 @@ export function caminhoDaFotoDoAtor(personId: string): string {
   return `atores/${personId}/perfil.jpg`;
 }
 
+/**
+ * A mesma foto, pequena, para os círculos das listas.
+ *
+ * O retrato sobe com 1024 de lado porque a ficha mostra ele grande. Só que
+ * quem aparece o tempo todo é o círculo de 28 pixels da lista de elenco — e
+ * baixar 216 kB para desenhar 28 pixels é o que fazia a tela de Pessoas
+ * demorar a completar no 4G.
+ */
+export function caminhoDaMiniaturaDoAtor(personId: string): string {
+  return `atores/${personId}/perfil-mini.jpg`;
+}
+
 export function caminhoDaCapaDaPeca(playId: string): string {
   return `pecas/${playId}/capa.jpg`;
 }
@@ -45,6 +57,11 @@ export function caminhoDaFotoDoPersonagem(playId: string, characterId: string): 
 /** Maior lado da imagem depois do redimensionamento, por tipo de uso. */
 export const LADO_RETRATO = 1024;
 export const LADO_CENA = 1600;
+/*
+ * 128 para círculos de até 56 pixels. O dobro do maior uso cobre tela de alta
+ * densidade, que é todo celular, e ainda cabe em poucos kB.
+ */
+export const LADO_MINIATURA = 128;
 
 const TAMANHO_MAXIMO = 12 * 1024 * 1024;
 

@@ -423,7 +423,7 @@ export default function Pessoas() {
                               href={`/admin/pessoas/detalhe?id=${pessoa.id}`}
                               className="flex min-w-0 items-center gap-2.5"
                             >
-                              <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} tamanho={28} />
+                              <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} mini={pessoa.fotoMiniUrl} tamanho={28} />
                               <span className="truncate text-[14px] font-medium text-ink-heading hover:text-brand-strong">
                                 {nomeCurto(pessoa.nome)}
                               </span>
@@ -473,7 +473,7 @@ export default function Pessoas() {
                         <Link href={`/admin/pessoas/detalhe?id=${pessoa.id}`} className="block">
                           <Cartao className="px-4 py-3.5 transition-colors hover:bg-surface-hover">
                             <div className="flex items-start gap-3">
-                              <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} tamanho={40} />
+                              <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} mini={pessoa.fotoMiniUrl} tamanho={40} />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-[15px] leading-[22px] font-bold text-ink-heading">
                                   {nomeCurto(pessoa.nome)}

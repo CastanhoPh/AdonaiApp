@@ -120,6 +120,13 @@ export interface Person {
   nome: string;
   email: string;
   fotoUrl: string;
+  /**
+   * A mesma foto, pequena, para os círculos das listas.
+   *
+   * Vazio nos cadastros antigos e em quem nunca enviou foto — `Avatar` cai no
+   * retrato grande quando falta.
+   */
+  fotoMiniUrl?: string;
   ativo: boolean;
   /**
    * Ids de `traits/{traitId}` marcadas para a pessoa.

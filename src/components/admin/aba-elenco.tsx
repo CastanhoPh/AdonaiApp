@@ -319,6 +319,7 @@ export function AbaElenco({
                       <Avatar
                         nome={personagemFoco.personNome}
                         url={porId.get(personagemFoco.personId)?.fotoUrl}
+                        mini={porId.get(personagemFoco.personId)?.fotoMiniUrl}
                         tamanho={40}
                       />
                       <div className="min-w-[150px] flex-1">
@@ -409,6 +410,7 @@ export function AbaElenco({
                             <Avatar
                               nome={candidato.pessoa.nome}
                               url={candidato.pessoa.fotoUrl}
+                              mini={candidato.pessoa.fotoMiniUrl}
                               tamanho={28}
                             />
                             <div className="min-w-0 flex-1">

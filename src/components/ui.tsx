@@ -477,14 +477,21 @@ export function Vazio({
 export function Avatar({
   nome,
   url,
+  mini,
   tamanho = 40,
 }: {
   nome: string;
   url?: string;
+  /**
+   * Versão pequena da foto. Quando existe, é sempre ela que vai para a tela:
+   * nenhum avatar passa de 56 pixels, e o retrato grande tem 1024.
+   */
+  mini?: string;
   tamanho?: 28 | 40 | 56;
 }) {
+  const fonte = mini || url;
   const texto = tamanho === 28 ? "text-[11px]" : tamanho === 56 ? "text-[18px]" : "text-[14px]";
-  if (url) {
+  if (fonte) {
     return (
       /*
        * Foto vinda do Storage ou de uma URL informada pela direção.
@@ -497,7 +504,7 @@ export function Avatar({
        */
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={url}
+        src={fonte}
         alt={nome}
         width={tamanho}
         height={tamanho}

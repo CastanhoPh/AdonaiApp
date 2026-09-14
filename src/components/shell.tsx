@@ -353,7 +353,7 @@ export function TopoInicio({ saudacao, nome }: { saudacao: string; nome: string 
   const { pessoa, conta } = useAuth();
   return (
     <MolduraTopo>
-      <Avatar nome={nome} url={pessoa?.fotoUrl} tamanho={40} />
+      <Avatar nome={nome} url={pessoa?.fotoUrl} mini={pessoa?.fotoMiniUrl} tamanho={40} />
       <div className="min-w-0 flex-1">
         <p className="text-[12px] leading-[18px] text-ink-caption">{saudacao},</p>
         <p className="truncate text-[16px] leading-6 font-bold text-ink-heading">
@@ -451,18 +451,20 @@ function MenuConta({
   nome,
   email,
   foto,
+  fotoMini,
 }: {
   aberto: boolean;
   onFechar: () => void;
   nome: string;
   email: string;
   foto?: string;
+  fotoMini?: string;
 }) {
   const { sair } = useAuth();
   return (
     <Modal titulo="Sua conta" aberto={aberto} onFechar={onFechar}>
       <div className="mb-4 flex items-center gap-3">
-        <Avatar nome={nome} url={foto} tamanho={40} />
+        <Avatar nome={nome} url={foto} mini={fotoMini} tamanho={40} />
         <div className="min-w-0">
           <p className="truncate text-[15px] leading-[22px] font-bold text-ink-heading">{nome}</p>
           <p className="truncate text-[12px] leading-[18px] text-ink-caption">{email}</p>
@@ -516,6 +518,7 @@ export function ShellAdmin({ children }: { children: ReactNode }) {
   const nome = nomeCurto(pessoa?.nome ?? conta?.nome ?? "");
   const email = conta?.email ?? "";
   const foto = pessoa?.fotoUrl;
+  const fotoMini = pessoa?.fotoMiniUrl;
 
   return (
     <div className="flex min-h-dvh bg-surface-base">
@@ -563,7 +566,7 @@ export function ShellAdmin({ children }: { children: ReactNode }) {
             title="Sua conta"
             className="flex w-full items-center gap-2.5 rounded-[8px] p-1 text-left transition-colors hover:bg-surface-hover min-[900px]:max-[1099px]:justify-center"
           >
-            <Avatar nome={nome} url={foto} tamanho={28} />
+            <Avatar nome={nome} url={foto} mini={fotoMini} tamanho={28} />
             <span className="min-w-0 flex-1 leading-tight min-[900px]:max-[1099px]:hidden">
               <span className="block truncate text-[13px] font-medium text-ink-heading">
                 {nome}
@@ -590,7 +593,7 @@ export function ShellAdmin({ children }: { children: ReactNode }) {
             aria-label="Sua conta"
             className="grid size-11 shrink-0 place-items-center rounded-[8px] transition-colors hover:bg-surface-hover"
           >
-            <Avatar nome={nome} url={foto} tamanho={28} />
+            <Avatar nome={nome} url={foto} mini={fotoMini} tamanho={28} />
           </button>
         </header>
 
@@ -640,6 +643,7 @@ export function ShellAdmin({ children }: { children: ReactNode }) {
         nome={nome}
         email={email}
         foto={foto}
+        fotoMini={fotoMini}
       />
     </div>
   );

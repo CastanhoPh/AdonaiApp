@@ -7,7 +7,11 @@ import { useAuth } from "@/lib/auth-context";
 import { atualizarPessoa, listarParticipacoes } from "@/lib/db";
 import { ano, ehMenorDeIdade, idade, nomeCurto, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
-import { caminhoDaFotoDoAtor } from "@/lib/armazenamento";
+import {
+  LADO_MINIATURA,
+  caminhoDaFotoDoAtor,
+  caminhoDaMiniaturaDoAtor,
+} from "@/lib/armazenamento";
 import { reabrirGuia } from "@/lib/instalacao";
 import { useAtual } from "@/lib/uso-atual";
 import { MAIORIDADE, ROLE_TYPE_LABEL, type Participation } from "@/lib/types";
@@ -56,10 +60,11 @@ export default function Perfil() {
   }
 
   /** Grava a URL que o Storage devolveu e recarrega a sessão para o avatar trocar. */
-  async function guardarFoto(url: string) {
+  async function guardarFoto(url: string, miniUrl = "") {
     await enviar(async () => {
       if (!pessoa) return;
-      await atualizarPessoa(pessoa.id, { fotoUrl: url });
+      // As duas juntas: a grande para a ficha, a pequena para os círculos.
+      await atualizarPessoa(pessoa.id, { fotoUrl: url, fotoMiniUrl: miniUrl });
       await recarregar();
     });
     setSalvo(true);
@@ -100,7 +105,7 @@ export default function Perfil() {
 
       <Cartao className="mb-4 px-4 py-4">
         <div className="flex items-start gap-3.5">
-          <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} tamanho={56} />
+          <Avatar nome={pessoa.nome} url={pessoa.fotoUrl} mini={pessoa.fotoMiniUrl} tamanho={56} />
           <div className="min-w-0 flex-1">
             <p className="text-[20px] leading-6 font-bold text-ink-heading">
               {nomeCurto(pessoa.nome)}
@@ -140,10 +145,11 @@ export default function Perfil() {
           <div className="mt-4 space-y-3 border-t border-stroke-frame pt-4">
             <EnviarFoto
               caminho={caminhoDaFotoDoAtor(pessoa.id)}
+              miniatura={{ caminho: caminhoDaMiniaturaDoAtor(pessoa.id), lado: LADO_MINIATURA }}
               atual={pessoa.fotoUrl}
               rotulo="Escolher da galeria"
               onEnviada={guardarFoto}
-              onRemovida={() => guardarFoto("")}
+              onRemovida={() => guardarFoto("", "")}
               desabilitado={enviando}
             />
             {erro ? <Aviso>{erro}</Aviso> : null}

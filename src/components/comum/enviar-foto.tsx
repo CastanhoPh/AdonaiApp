@@ -20,6 +20,7 @@ export function EnviarFoto({
   caminho,
   atual,
   ladoMaximo,
+  miniatura,
   formato = "circulo",
   rotulo = "Escolher foto",
   onEnviada,
@@ -31,9 +32,18 @@ export function EnviarFoto({
   /** URL da foto que já está lá, para a prévia. */
   atual?: string;
   ladoMaximo?: number;
+  /**
+   * Quando presente, sobe também uma cópia pequena no caminho indicado, e
+   * `onEnviada` recebe as duas URLs.
+   *
+   * É o que evita baixar um retrato de 1024 pixels para desenhar um círculo de
+   * 28 nas listas. As duas saem do mesmo arquivo escolhido, numa passada só:
+   * gerar a pequena depois obrigaria a baixar de volta a grande.
+   */
+  miniatura?: { caminho: string; lado: number };
   formato?: "circulo" | "retangulo";
   rotulo?: string;
-  onEnviada: (url: string) => void | Promise<void>;
+  onEnviada: (url: string, miniUrl?: string) => void | Promise<void>;
   /** Sem isto, não aparece a opção de remover. */
   onRemovida?: () => void | Promise<void>;
   desabilitado?: boolean;
@@ -74,7 +84,10 @@ export function EnviarFoto({
         ladoMaximo,
         aoProgredir: setProgresso,
       });
-      await onEnviada(url);
+      const miniUrl = miniatura
+        ? (await enviarImagem(miniatura.caminho, arquivo, { ladoMaximo: miniatura.lado })).url
+        : undefined;
+      await onEnviada(url, miniUrl);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível enviar a foto.");
     } finally {
@@ -90,6 +103,7 @@ export function EnviarFoto({
     setEnviando(true);
     try {
       await removerImagem(caminho);
+      if (miniatura) await removerImagem(miniatura.caminho);
       await onRemovida();
       setPrevia(null);
     } catch (e) {
