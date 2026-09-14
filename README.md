@@ -298,6 +298,62 @@ de quem vai assistir. [`src/lib/youtube.ts`](src/lib/youtube.ts) extrai o id do
 endereço — aceita `youtube.com/watch`, `youtu.be` e `/shorts/` — e monta a capa
 a partir dele, que é a única coisa que a lista baixa do YouTube.
 
+## Roteiro
+
+Cada linha é um documento: ato, cena, ordem dentro da cena, tipo (fala,
+narração ou indicação de cena), texto, e **quem diz**. Esse último é o que
+sustenta o app — é o vínculo fala↔personagem que faz o roteiro destacar as
+falas de cada um.
+
+**Quem diz é uma lista, não um.** Roteiro tem fala em coro: "Pai e Mãe: você
+não devia ter nascido!", ou a peça inteira gritando junto. Com um personagem
+só, essas linhas eram duplicadas — e apareciam repetidas no roteiro — ou
+ficavam sem dono, e quem ficasse sem dono não via a própria fala destacada. No
+editor cada nome é um botão que liga e desliga, com um atalho para o elenco
+inteiro.
+
+Atos e cenas têm título próprio ("Ato II — A espera"), guardados repetidos nas
+linhas: não existe coleção separada de atos e cenas, e por isso toda cena nasce
+junto com a primeira linha dela.
+
+### Importar de um arquivo
+
+Os roteiros do grupo são escritos em `.docx`, e digitá-los linha a linha no
+editor não é caminho — cada um passa de cem linhas. **Peças › (uma peça) ›
+Roteiro › Importar roteiro** lê o arquivo e mostra a prévia antes de gravar.
+
+O formato reconhecido é o que o grupo já usa:
+
+```
+Cena 1
+(A cena começa com a Principal sentada na sala de aula.)
+Principal:Nossa, que prova difícil…
+Pai e Mãe:Você não devia ter nascido!
+```
+
+Cabeçalho de cena numerado, rubrica entre parênteses, fala como `Quem: texto` —
+com ou sem espaço depois dos dois-pontos. Ato é opcional; sem ele tudo entra no
+ato 1. O que vier antes da primeira cena (título, nota de elenco) é listado como
+"fora do roteiro" em vez de virar linha.
+
+O `.docx` é aberto no próprio navegador, sem biblioteca: é um zip, e
+`DecompressionStream` descompacta. Um leitor de zip pronto custaria uns 100 kB
+que todo participante baixaria para uma tela que só a direção abre. Navegador
+antigo demais recebe um aviso e o campo de colar texto, que aceita qualquer
+formato.
+
+**O importador não adivinha personagem.** O roteiro chama pelo papel
+("Principal", "Mãe") e o cadastro chama pelo nome ("Amanda", "Mãe da Amanda"),
+então a segunda etapa pergunta quem é quem, um por um, com a contagem de falas
+de cada nome ao lado. Casar por semelhança de texto acertaria na maioria e
+erraria em silêncio na minoria — e uma fala no personagem errado é uma fala que
+some do roteiro de quem deveria dizê-la. Nome que não existe na peça pode ser
+criado ali mesmo, sem ator, para a direção escalar depois.
+
+**Importar não publica.** O roteiro entra como rascunho; a direção confere no
+editor e publica quando estiver certo. Peça que já tem roteiro exige marcar a
+substituição, que apaga o que está lá.
+
 ## Acervo: peças que já aconteceram
 
 O caminho normal de uma peça — planejamento, escalação, ensaios, conclusão —
@@ -651,11 +707,6 @@ coleção inteira para mostrar um número.
 - A tela de **Início** faz três passos em vez de seis consultas em série: peça e
   histórico em paralelo, depois personagem e ensaios em paralelo, e por fim as
   falas.
-- **Início** e **Meu personagem** usam `listarFalasDoPersonagem`, que filtra por
-  `characterId`. Antes baixavam o roteiro completo só para contar "14 falas
-  suas". Num teste com 250 falas e 3 personagens, a consulta filtrada leu 84
-  documentos em vez de 250 — 66% menos; com um elenco real, de dez ou mais
-  personagens, a diferença passa de 90%.
 - O total de cenas da peça é gravado em `plays.totalCenas` na publicação do
   roteiro, então a tela do personagem não precisa varrer as falas para saber o
   tamanho da peça.

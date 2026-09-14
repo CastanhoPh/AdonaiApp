@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, MagnifyingGlass, TextAa, X } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth-context";
 import { listarFalas } from "@/lib/db";
-import { dataCurta, normalizar, rotuloCena } from "@/lib/format";
+import { dataCurta, nomesDaFala, normalizar, rotuloCena } from "@/lib/format";
 import { useCarregar } from "@/lib/hooks";
 import { useAtual } from "@/lib/uso-atual";
 import type { ScriptLine } from "@/lib/types";
@@ -90,7 +90,7 @@ export default function Roteiro() {
   const minhasFalas = useMemo(
     () =>
       meusIds.size > 0
-        ? lista.filter((f) => f.tipo === "fala" && f.characterId && meusIds.has(f.characterId))
+        ? lista.filter((f) => f.tipo === "fala" && f.characterIds.some((id) => meusIds.has(id)))
         : [],
     [lista, meusIds],
   );
@@ -130,7 +130,7 @@ export default function Roteiro() {
   const combina = (fala: ScriptLine) =>
     !termo ||
     normalizar(fala.texto).includes(termo) ||
-    normalizar(fala.characterNome).includes(termo);
+    normalizar(fala.characterNomes.join(" ")).includes(termo);
 
   if (!pessoa) {
     return (
@@ -297,8 +297,9 @@ export default function Roteiro() {
 
                 {ato.cenas.map((cena) => {
                   const minhasNaCena = personagem
-                    ? cena.falas.filter((f) => f.tipo === "fala" && f.characterId && meusIds.has(f.characterId))
-                        .length
+                    ? cena.falas.filter(
+                        (f) => f.tipo === "fala" && f.characterIds.some((id) => meusIds.has(id)),
+                      ).length
                     : 0;
                   const visiveis = cena.falas.filter(combina);
                   if (termo && visiveis.length === 0) return null;
@@ -319,10 +320,16 @@ export default function Roteiro() {
 
                       <ol className="flex flex-col gap-3.5">
                         {cena.falas.map((fala) => {
+                          /*
+                           * Fala em coro é sua também.
+                           *
+                           * `meusIds` cobre quem acumula papel na mesma peça, e
+                           * `some` cobre a linha dita por vários — "Pai e Mãe:
+                           * você não devia ter nascido!" tem de acender para o
+                           * Pai e para a Mãe.
+                           */
                           const minha =
-                            Boolean(personagem) &&
-                            fala.tipo === "fala" &&
-                            fala.characterId === personagem?.id;
+                            fala.tipo === "fala" && fala.characterIds.some((id) => meusIds.has(id));
                           const escondida = termo !== "" && !combina(fala);
 
                           if (fala.tipo === "acao") {
@@ -353,7 +360,7 @@ export default function Roteiro() {
                               >
                                 <div className="mb-1 flex items-center justify-between gap-2">
                                   <span className="eyebrow-fala text-[color:var(--color-speech-label)]">
-                                    {fala.characterNome || "Personagem"}
+                                    {nomesDaFala(fala.characterNomes) || "Personagem"}
                                   </span>
                                   <span className="text-[10px] leading-4 tracking-[0.12em] text-[color:var(--color-speech-label)] uppercase">
                                     Sua fala
@@ -378,7 +385,7 @@ export default function Roteiro() {
                               <p className="eyebrow-fala mb-1 text-ink-caption">
                                 {fala.tipo === "narracao"
                                   ? "Narrador"
-                                  : fala.characterNome || "Personagem"}
+                                  : nomesDaFala(fala.characterNomes) || "Personagem"}
                               </p>
                               <p className="text-ink-body" style={{ lineHeight: 1.53 }}>
                                 {fala.texto}

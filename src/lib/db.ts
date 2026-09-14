@@ -92,6 +92,7 @@ import type {
   ContatoPessoal,
   Convite,
   Exercise,
+  LineKind,
   Participation,
   Person,
   PersonNotes,
@@ -1034,6 +1035,73 @@ export async function publicarRoteiro(
     totalFalas: totais.falas,
     totalCenas: totais.cenas,
   });
+}
+
+/**
+ * Grava de uma vez o roteiro lido de um arquivo.
+ *
+ * Em lotes de 400 porque o Firestore aceita 500 gravações por lote, e um
+ * roteiro de peça grande passa disso com folga. Cada lote é atômico por si; se
+ * um falhar no meio, os anteriores ficam — por isso `substituir` limpa antes,
+ * e não depois: a alternativa era terminar com meio roteiro novo misturado com
+ * o antigo, e ninguém conseguiria dizer onde um acaba e o outro começa.
+ *
+ * `mapa` já vem resolvido pela tela: nome escrito no roteiro → ids de
+ * personagem. O analisador não adivinha personagem, e esta função tampouco —
+ * quem casa os nomes é a direção, que sabe que "Principal" é a Amanda.
+ */
+export async function importarRoteiro(
+  playId: string,
+  linhas: {
+    ato: number;
+    cena: number;
+    cenaTitulo: string;
+    tipo: LineKind;
+    quem: string;
+    texto: string;
+  }[],
+  mapa: Record<string, { ids: string[]; nomes: string[] }>,
+  { substituir }: { substituir: boolean },
+): Promise<{ gravadas: number; apagadas: number }> {
+  let apagadas = 0;
+  if (substituir) {
+    const existentes = await getDocs(collection(db, "plays", playId, "lines"));
+    for (let i = 0; i < existentes.docs.length; i += 400) {
+      const lote = writeBatch(db);
+      existentes.docs.slice(i, i + 400).forEach((d) => lote.delete(d.ref));
+      await lote.commit();
+    }
+    apagadas = existentes.size;
+  }
+
+  /* A ordem é dentro da cena, e é a ordem em que as linhas foram lidas. */
+  const ordemPorCena = new Map<string, number>();
+
+  for (let i = 0; i < linhas.length; i += 400) {
+    const lote = writeBatch(db);
+    for (const linha of linhas.slice(i, i + 400)) {
+      const chave = `${linha.ato}-${linha.cena}`;
+      const ordem = ordemPorCena.get(chave) ?? 0;
+      ordemPorCena.set(chave, ordem + 1);
+      const quem = linha.tipo === "fala" ? (mapa[linha.quem] ?? { ids: [], nomes: [] }) : null;
+      lote.set(doc(collection(db, "plays", playId, "lines")), {
+        playId,
+        ato: linha.ato,
+        atoTitulo: "",
+        cena: linha.cena,
+        cenaTitulo: linha.cenaTitulo,
+        ordem,
+        tipo: linha.tipo,
+        characterIds: quem?.ids ?? [],
+        characterNomes: quem?.nomes ?? [],
+        texto: linha.texto,
+      });
+    }
+    await lote.commit();
+  }
+
+  await marcarRoteiroEditado(playId);
+  return { gravadas: linhas.length, apagadas };
 }
 
 /** Registra a hora da última alteração no rascunho do roteiro. */

@@ -51,7 +51,7 @@ export default function MeusPersonagens() {
       const falas = (await listarFalas(peca.id)).filter((f) => f.tipo === "fala");
       const porPapel: Numeros["porPapel"] = {};
       for (const papel of personagens) {
-        const minhas = falas.filter((f) => f.characterId === papel.id);
+        const minhas = falas.filter((f) => f.characterIds.includes(papel.id));
         porPapel[papel.id] = {
           falas: minhas.length,
           cenas: new Set(minhas.map((f) => `${f.ato}-${f.cena}`)).size,

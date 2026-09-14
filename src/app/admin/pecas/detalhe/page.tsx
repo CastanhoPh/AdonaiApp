@@ -113,9 +113,9 @@ function ConteudoPeca() {
   const falasPorPersonagem = useMemo(() => {
     const mapa = new Map<string, number>();
     falas.forEach((f) => {
-      if (f.tipo === "fala" && f.characterId) {
-        mapa.set(f.characterId, (mapa.get(f.characterId) ?? 0) + 1);
-      }
+      if (f.tipo !== "fala") return;
+      // Fala em coro entra na conta de cada um que a diz.
+      f.characterIds.forEach((id) => mapa.set(id, (mapa.get(id) ?? 0) + 1));
     });
     return mapa;
   }, [falas]);

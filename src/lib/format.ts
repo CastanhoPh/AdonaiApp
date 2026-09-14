@@ -192,3 +192,16 @@ export function ehMenorDeIdade(nascimento: string, maioridade = 18): boolean {
   const anos = idade(nascimento);
   return anos !== null && anos < maioridade;
 }
+
+/**
+ * Quem diz uma fala, escrito como no papel.
+ *
+ * "Pai"; "Pai e Mãe"; "Pai, Mãe e Namorado". Usado pelo editor e pelo roteiro
+ * do participante — as duas telas mostram a mesma linha, e escrever de formas
+ * diferentes faria a direção duvidar de qual está certa.
+ */
+export function nomesDaFala(nomes: string[]): string {
+  if (nomes.length === 0) return "";
+  if (nomes.length === 1) return nomes[0];
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}

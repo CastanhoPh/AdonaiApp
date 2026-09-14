@@ -100,8 +100,9 @@ export default function Inicio() {
 
     // Falas de todos os papéis: quem acumula precisa ver a conta somada.
     const minhas = personagens.length > 0
-      ? (await listarFalas(peca.id)).filter(
-          (f) => f.characterId && personagens.some((c) => c.id === f.characterId),
+      ? (await listarFalas(peca.id)).filter((f) =>
+          // Fala em coro conta uma vez para quem participa dela.
+          f.characterIds.some((id) => personagens.some((c) => c.id === id)),
         )
       : [];
 

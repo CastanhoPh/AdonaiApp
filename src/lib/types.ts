@@ -343,9 +343,23 @@ export interface ScriptLine {
   cenaTitulo: string;
   ordem: number;
   tipo: LineKind;
-  /** Obrigatório quando `tipo` é `fala`: permite destacar as falas do usuário. */
-  characterId: string | null;
-  characterNome: string;
+  /**
+   * Quem diz a linha. Vazio em narração e ação de cena.
+   *
+   * É uma lista porque roteiro tem fala em coro — "Pai e Mãe: você não devia
+   * ter nascido!", ou a peça inteira gritando junto. Com um personagem só,
+   * essas linhas precisavam ser duplicadas ou ficar sem dono, e quem ficasse
+   * sem dono não via a própria fala destacada no roteiro. O destaque é o que o
+   * app existe para fazer.
+   */
+  characterIds: string[];
+  /**
+   * Os nomes, na mesma ordem dos ids.
+   *
+   * Copiados de propósito: o roteiro mostra quem fala sem precisar carregar os
+   * personagens da peça junto. Renomear um personagem propaga para cá.
+   */
+  characterNomes: string[];
   texto: string;
 }
 

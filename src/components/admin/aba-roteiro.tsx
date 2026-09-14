@@ -14,7 +14,7 @@ import {
   renomearCena,
   reordenarFalas,
 } from "@/lib/db";
-import { editadoEm, pluralizar, rotuloAto, rotuloCena } from "@/lib/format";
+import { editadoEm, nomesDaFala, pluralizar, rotuloAto, rotuloCena } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import {
   LINE_KINDS,
@@ -25,6 +25,8 @@ import {
   type ScriptLine,
 } from "@/lib/types";
 import { ErroCarregamento } from "@/components/shell";
+import { EscolherPersonagens } from "./escolher-personagens";
+import { ImportarRoteiro } from "./importar-roteiro";
 import {
   AreaTexto,
   Aviso,
@@ -117,14 +119,20 @@ export function AbaRoteiro({ playId }: { playId: string }) {
   /** Texto em edição por linha, gravado no blur. */
   const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
   const [novaLinha, setNovaLinha] = useState<LineKind | null>(null);
-  const [formLinha, setFormLinha] = useState({ characterId: "", texto: "" });
+  const [formLinha, setFormLinha] = useState<{ characterIds: string[]; texto: string }>({
+    characterIds: [],
+    texto: "",
+  });
+  /** Fala cuja escolha de personagens está aberta. */
+  const [escolhendo, setEscolhendo] = useState<ScriptLine | null>(null);
   const [novaCena, setNovaCena] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [publicando, setPublicando] = useState(false);
+  const [importando, setImportando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const semPersonagem = falas.filter((f) => f.tipo === "fala" && !f.characterId).length;
-  const vinculadas = falas.filter((f) => f.tipo === "fala" && f.characterId).length;
+  const semPersonagem = falas.filter((f) => f.tipo === "fala" && f.characterIds.length === 0).length;
+  const vinculadas = falas.filter((f) => f.tipo === "fala" && f.characterIds.length > 0).length;
 
   async function gravarTexto(fala: ScriptLine) {
     const texto = rascunhos[fala.id];
@@ -141,12 +149,15 @@ export function AbaRoteiro({ playId }: { playId: string }) {
     });
   }
 
-  async function trocarPersonagem(fala: ScriptLine, characterId: string) {
-    const personagem = personagens.find((p) => p.id === characterId) ?? null;
+  async function trocarPersonagens(fala: ScriptLine, characterIds: string[]) {
     await enviar(async () => {
       await atualizarFala(id, fala.id, {
-        characterId: characterId || null,
-        characterNome: personagem?.nome ?? "",
+        characterIds,
+        // Os nomes acompanham os ids, na mesma ordem: é o que o roteiro mostra
+        // sem precisar carregar os personagens junto.
+        characterNomes: characterIds.map(
+          (cid) => personagens.find((p) => p.id === cid)?.nome ?? "",
+        ),
       });
       await marcarRoteiroEditado(id);
       await dados.recarregar();
@@ -180,11 +191,13 @@ export function AbaRoteiro({ playId }: { playId: string }) {
       definirErro("Escreva o texto da linha.");
       return;
     }
-    if (novaLinha === "fala" && !formLinha.characterId) {
-      definirErro("Escolha o personagem que diz esta fala.");
+    if (novaLinha === "fala" && formLinha.characterIds.length === 0) {
+      definirErro("Escolha quem diz esta fala.");
       return;
     }
-    const personagem = personagens.find((p) => p.id === formLinha.characterId) ?? null;
+    const nomes = formLinha.characterIds.map(
+      (cid) => personagens.find((p) => p.id === cid)?.nome ?? "",
+    );
     const ok = await enviar(async () => {
       await criarFala(id, {
         ato: cenaFoco.ato,
@@ -193,8 +206,8 @@ export function AbaRoteiro({ playId }: { playId: string }) {
         cenaTitulo: cenaFoco.cenaTitulo,
         ordem: cenaFoco.falas.length,
         tipo: novaLinha,
-        characterId: novaLinha === "fala" ? formLinha.characterId : null,
-        characterNome: novaLinha === "fala" ? (personagem?.nome ?? "") : "",
+        characterIds: novaLinha === "fala" ? formLinha.characterIds : [],
+        characterNomes: novaLinha === "fala" ? nomes : [],
         texto: formLinha.texto.trim(),
       });
       await marcarRoteiroEditado(id);
@@ -202,7 +215,7 @@ export function AbaRoteiro({ playId }: { playId: string }) {
     });
     if (ok) {
       setNovaLinha(null);
-      setFormLinha({ characterId: "", texto: "" });
+      setFormLinha({ characterIds: [], texto: "" });
     }
   }
 
@@ -239,6 +252,11 @@ export function AbaRoteiro({ playId }: { playId: string }) {
           · última edição {editadoEm(peca.roteiroEditadoEm)}
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Antes de "Salvar rascunho": digitar cem linhas à mão não é
+              caminho, e quem chega aqui com o roteiro pronto procura isto. */}
+          <Botao variante="ghost" onClick={() => setImportando(true)} disabled={enviando}>
+            Importar roteiro
+          </Botao>
           <Botao
             variante="ghost"
             onClick={() =>
@@ -384,26 +402,32 @@ export function AbaRoteiro({ playId }: { playId: string }) {
                         fala.tipo === "acao"
                           ? "border-stroke-frame bg-surface-lower"
                           : "border-stroke-frame bg-surface-card",
-                        fala.tipo === "fala" && !fala.characterId && "border-state-warning/50",
+                        fala.tipo === "fala" && fala.characterIds.length === 0 && "border-state-warning/50",
                       )}
                     >
                       <div className="flex items-start gap-3">
                         <div className="w-[150px] shrink-0 max-sm:w-[110px]">
                           {fala.tipo === "fala" ? (
-                            <Selecao
-                              value={fala.characterId ?? ""}
+                            /*
+                             * Botão que abre a escolha, e não a escolha aqui
+                             * dentro: com o elenco inteiro cabendo na linha, a
+                             * coluna ficaria maior que a fala. Aqui mostra
+                             * quem diz; escolher acontece na janela.
+                             */
+                            <button
+                              type="button"
                               disabled={enviando}
-                              onChange={(e) => void trocarPersonagem(fala, e.target.value)}
-                              aria-label="Personagem da fala"
-                              className="h-9 text-[13px]"
+                              onClick={() => setEscolhendo(fala)}
+                              aria-label="Quem diz esta fala"
+                              className={juntar(
+                                "w-full rounded-[8px] border px-2.5 py-1.5 text-left text-[13px] leading-5 transition-colors hover:bg-surface-hover disabled:opacity-50",
+                                fala.characterIds.length === 0
+                                  ? "border-state-warning/50 text-ink-caption"
+                                  : "border-stroke-frame text-ink-heading",
+                              )}
                             >
-                              <option value="">Sem personagem</option>
-                              {personagens.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.nome}
-                                </option>
-                              ))}
-                            </Selecao>
+                              {nomesDaFala(fala.characterNomes) || "Sem personagem"}
+                            </button>
                           ) : (
                             <p className="pt-2 text-[13px] leading-5 font-bold text-ink-caption">
                               {LINE_KIND_LABEL[fala.tipo]}
@@ -462,7 +486,7 @@ export function AbaRoteiro({ playId }: { playId: string }) {
                     type="button"
                     onClick={() => {
                       definirErro(null);
-                      setFormLinha({ characterId: "", texto: "" });
+                      setFormLinha({ characterIds: [], texto: "" });
                       setNovaLinha("fala");
                     }}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-stroke-frame text-[13px] font-medium text-ink-caption transition-colors hover:border-brand hover:text-brand-strong"
@@ -474,7 +498,7 @@ export function AbaRoteiro({ playId }: { playId: string }) {
                     type="button"
                     onClick={() => {
                       definirErro(null);
-                      setFormLinha({ characterId: "", texto: "" });
+                      setFormLinha({ characterIds: [], texto: "" });
                       setNovaLinha("acao");
                     }}
                     className="flex h-11 items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-stroke-frame text-[13px] font-medium text-ink-caption transition-colors hover:border-brand hover:text-brand-strong"
@@ -500,6 +524,51 @@ export function AbaRoteiro({ playId }: { playId: string }) {
         </div>
       </div>
 
+      <ImportarRoteiro
+        playId={id}
+        personagens={personagens}
+        falasExistentes={falas.length}
+        aberto={importando}
+        onFechar={() => setImportando(false)}
+        onImportado={async () => {
+          await dados.recarregar();
+        }}
+      />
+
+      {/* Quem diz esta fala */}
+      <Modal
+        titulo="Quem diz esta fala"
+        aberto={escolhendo !== null}
+        onFechar={() => setEscolhendo(null)}
+        rodape={
+          <Botao variante="bare" onClick={() => setEscolhendo(null)}>
+            Concluir
+          </Botao>
+        }
+      >
+        {escolhendo ? (
+          <div className="space-y-3">
+            <p className="text-[13px] leading-5 text-ink-caption italic">“{escolhendo.texto}”</p>
+            {/*
+              * Grava a cada toque, sem botão de salvar.
+              *
+              * A janela existe para corrigir uma linha no meio da revisão do
+              * roteiro, e um passo a mais por linha multiplicado por centenas
+              * de linhas é o que faz ninguém revisar. `escolhendo` é relido da
+              * lista recarregada para os botões refletirem o que foi gravado.
+              */}
+            <EscolherPersonagens
+              personagens={personagens}
+              selecionados={
+                falas.find((f) => f.id === escolhendo.id)?.characterIds ?? escolhendo.characterIds
+              }
+              onMudar={(ids) => void trocarPersonagens(escolhendo, ids)}
+              desabilitado={enviando}
+            />
+          </div>
+        ) : null}
+      </Modal>
+
       {/* Nova linha */}
       <Modal
         titulo={novaLinha === "acao" ? "Nova indicação de cena" : "Nova fala"}
@@ -519,21 +588,16 @@ export function AbaRoteiro({ playId }: { playId: string }) {
         <div className="space-y-3.5">
           {novaLinha === "fala" ? (
             <Campo
-              etiqueta="Personagem"
+              etiqueta="Quem diz"
               obrigatorio
-              dica="É este vínculo que destaca a fala para o participante escalado."
+              dica="É este vínculo que destaca a fala para quem está escalado. Mais de um marca fala em coro."
             >
-              <Selecao
-                value={formLinha.characterId}
-                onChange={(e) => setFormLinha({ ...formLinha, characterId: e.target.value })}
-              >
-                <option value="">Escolha o personagem</option>
-                {personagens.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nome}
-                  </option>
-                ))}
-              </Selecao>
+              <EscolherPersonagens
+                personagens={personagens}
+                selecionados={formLinha.characterIds}
+                onMudar={(ids) => setFormLinha({ ...formLinha, characterIds: ids })}
+                desabilitado={enviando}
+              />
             </Campo>
           ) : null}
 
@@ -650,7 +714,7 @@ function FormularioNovaCena({
     cena: String((ultima?.cena ?? 0) + 1),
     cenaTitulo: "",
     tipo: "acao" as LineKind,
-    characterId: "",
+    characterIds: [] as string[],
     texto: "",
   });
 
@@ -669,11 +733,13 @@ function FormularioNovaCena({
       definirErro("Escreva a primeira linha da cena.");
       return;
     }
-    if (form.tipo === "fala" && !form.characterId) {
-      definirErro("Escolha o personagem da primeira fala.");
+    if (form.tipo === "fala" && form.characterIds.length === 0) {
+      definirErro("Escolha quem diz a primeira fala.");
       return;
     }
-    const personagem = personagens.find((p) => p.id === form.characterId) ?? null;
+    const nomes = form.characterIds.map(
+      (cid) => personagens.find((p) => p.id === cid)?.nome ?? "",
+    );
     const ok = await enviar(async () => {
       await criarFala(playId, {
         ato,
@@ -682,8 +748,8 @@ function FormularioNovaCena({
         cenaTitulo: form.cenaTitulo.trim(),
         ordem: 0,
         tipo: form.tipo,
-        characterId: form.tipo === "fala" ? form.characterId : null,
-        characterNome: form.tipo === "fala" ? (personagem?.nome ?? "") : "",
+        characterIds: form.tipo === "fala" ? form.characterIds : [],
+        characterNomes: form.tipo === "fala" ? nomes : [],
         texto: form.texto.trim(),
       });
       await marcarRoteiroEditado(playId);
@@ -753,7 +819,9 @@ function FormularioNovaCena({
               setForm({
                 ...form,
                 tipo: e.target.value as LineKind,
-                characterId: e.target.value === "fala" ? form.characterId : "",
+                // Narração e ação não têm quem diga: limpa para a linha não
+                // nascer com um vínculo que a tela já não mostra.
+                characterIds: e.target.value === "fala" ? form.characterIds : [],
               })
             }
           >
@@ -766,18 +834,12 @@ function FormularioNovaCena({
         </Campo>
 
         {form.tipo === "fala" ? (
-          <Campo etiqueta="Personagem" obrigatorio>
-            <Selecao
-              value={form.characterId}
-              onChange={(e) => setForm({ ...form, characterId: e.target.value })}
-            >
-              <option value="">Escolha o personagem</option>
-              {personagens.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome}
-                </option>
-              ))}
-            </Selecao>
+          <Campo etiqueta="Quem diz" obrigatorio>
+            <EscolherPersonagens
+              personagens={personagens}
+              selecionados={form.characterIds}
+              onMudar={(ids) => setForm({ ...form, characterIds: ids })}
+            />
           </Campo>
         ) : null}
 
