@@ -321,6 +321,23 @@ Um lote por peça, e idempotente: peça que já tem personagem não recebe elenc
 de novo. Elenco pela metade no histórico é pior que elenco nenhum, porque
 ninguém percebe o que ficou faltando.
 
+## Criar um login não é fazer parte do grupo
+
+Qualquer pessoa cria uma conta em `/cadastro` — é assim que o app funciona, e o
+Firebase aceita o cadastro de quem tiver a chave pública, que está no
+JavaScript da página. Por isso **estar autenticado não dá acesso a nada**: as
+regras exigem `users/{uid}.personId` preenchido, que é o vínculo que a direção
+faz em Pessoas ou que vem pronto no convite.
+
+Sem isso, uma conta recém-criada enxergava o elenco inteiro com fotos, os
+roteiros, o histórico e a agenda de ensaios com data, hora e endereço. A tela
+dizia "aguardando o cadastro da direção" e o banco entregava tudo a quem
+abrisse o console do navegador. Enquanto o endereço do app circulava só dentro
+do grupo isso era teórico; para uso público, não seria.
+
+O administrador vê tudo mesmo sem ficha ligada — `podeVer()` nas regras é "tem
+vínculo **ou** é da direção".
+
 ## O que é pessoal não fica na ficha
 
 `people` é lido por todo o elenco — a lista de elenco precisa de nome e foto.
@@ -412,7 +429,7 @@ pasta sincronizada — esta aqui está no OneDrive.
 | Coleção                             | Conteúdo                                       | Quem lê |
 | ----------------------------------- | ---------------------------------------------- | ------- |
 | `users/{uid}`                        | conta de acesso: papel e vínculo com a pessoa  | a própria conta e a direção |
-| `people/{id}`                        | integrante: nome, foto, situação, experiência  | todo o elenco |
+| `people/{id}`                        | integrante: nome, foto, situação, experiência  | quem é do grupo |
 | `people/{id}/privado/contato`        | telefone, nascimento, responsável              | a própria pessoa e a direção |
 | `people/{id}/privado/direcao`        | observações internas                           | só a direção |
 | `direcao/caracteristicas`            | características atribuídas a pessoas e papéis  | só a direção |

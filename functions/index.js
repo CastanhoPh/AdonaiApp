@@ -139,12 +139,28 @@ export const sincronizarClaims = onDocumentWritten(
   { ...COMUM, document: "users/{uid}" },
   async (evento) => {
     const uid = evento.params.uid;
-    const depois = evento.data?.after?.data();
-    if (!depois) return;
+    if (!evento.data?.after?.exists) return;
+
+    /*
+     * Relê o documento em vez de usar o que veio no evento.
+     *
+     * Duas gravações seguidas em `users/{uid}` disparam duas execuções, e elas
+     * não são entregues em ordem nem esperam uma pela outra. Com o valor do
+     * evento, a execução atrasada escrevia o estado velho por cima do novo — e
+     * a outra, que leu a claim certa, achava que não havia nada a fazer e
+     * voltava. O resultado era o pior caso possível: documento com o vínculo
+     * certo e token com o vínculo nulo, sem erro em lugar nenhum. A pessoa
+     * entra no app, vê tudo, e só o envio da foto é recusado.
+     *
+     * Relendo, qualquer ordem converge para o que está gravado agora.
+     */
+    const documento = await getFirestore().collection("users").doc(uid).get();
+    if (!documento.exists) return;
+    const dados = documento.data();
 
     const desejado = {
-      role: depois.role ?? "participante",
-      personId: depois.personId ?? null,
+      role: dados.role ?? "participante",
+      personId: dados.personId ?? null,
     };
 
     const usuario = await getAuth().getUser(uid);

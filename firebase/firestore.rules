@@ -35,6 +35,30 @@ service cloud.firestore {
       return temConta() && conta().role == 'admin';
     }
 
+    /*
+     * Quem faz parte do teatro: tem conta **e** está ligado a uma ficha.
+     *
+     * Estar autenticado não basta, e essa era a brecha. Qualquer pessoa cria
+     * uma conta em /cadastro — é assim que o app funciona, e o Firebase aceita
+     * de quem tiver a chave pública, que está no JavaScript da página. Com
+     * `autenticado()` na leitura, essa conta recém-criada já enxergava o
+     * elenco inteiro com fotos, os roteiros, o histórico e a agenda de ensaios
+     * com data, hora e endereço. A tela mostrava "aguardando o cadastro da
+     * direção"; o banco entregava tudo a quem abrisse o console do navegador.
+     *
+     * O vínculo é da direção — ela liga a conta à ficha em Pessoas, ou o
+     * convite já vem ligado. É ele que separa "criou um login" de "é do
+     * grupo", e é isso que estas regras passam a exigir.
+     */
+    function doGrupo() {
+      return temConta() && conta().personId != null;
+    }
+
+    /** O elenco e a direção. Administrador vê tudo mesmo sem ficha ligada. */
+    function podeVer() {
+      return doGrupo() || ehAdmin();
+    }
+
     // ----------------------------------------------------------- contas
 
     match /users/{uid} {
@@ -73,7 +97,7 @@ service cloud.firestore {
 
     match /people/{personId} {
       // O elenco precisa se enxergar; o cadastro em si é da direção.
-      allow get, list: if autenticado();
+      allow get, list: if podeVer();
       allow create, delete: if ehAdmin();
       // A pessoa mantém os próprios dados e responde o cadastro de primeiro
       // acesso. Fora desta lista nada muda: `ativo` é decisão do grupo e
@@ -168,16 +192,16 @@ service cloud.firestore {
     // ------------------------------------------------------------ peças
 
     match /plays/{playId} {
-      allow get, list: if autenticado();
+      allow get, list: if podeVer();
       allow write: if ehAdmin();
 
       match /characters/{characterId} {
-        allow get, list: if autenticado();
+        allow get, list: if podeVer();
         allow write: if ehAdmin();
       }
 
       match /lines/{lineId} {
-        allow get, list: if autenticado();
+        allow get, list: if podeVer();
         allow write: if ehAdmin();
       }
     }
@@ -185,7 +209,7 @@ service cloud.firestore {
     // --------------------------------------------------------- ensaios
 
     match /rehearsals/{rehearsalId} {
-      allow get, list: if autenticado();
+      allow get, list: if podeVer();
       allow write: if ehAdmin();
 
       // Confirmação de presença. O id do documento é o da pessoa, então cada
@@ -197,7 +221,7 @@ service cloud.firestore {
       // não existe —, e era uma torneira aberta de documentos que ninguém
       // nunca leria.
       match /presencas/{personId} {
-        allow get, list: if autenticado();
+        allow get, list: if podeVer();
         allow write: if exists(/databases/$(database)/documents/rehearsals/$(rehearsalId))
           && (ehAdmin() || (temConta() && conta().personId == personId));
       }
@@ -215,7 +239,7 @@ service cloud.firestore {
     // Todo o elenco lê; só a direção monta a lista. Não há nada de pessoal
     // aqui: é o mesmo material de preparação para todos.
     match /exercicios/{exercicioId} {
-      allow get, list: if autenticado();
+      allow get, list: if podeVer();
       allow write: if ehAdmin();
     }
 
@@ -248,7 +272,7 @@ service cloud.firestore {
     // --------------------------------------------------- participações
 
     match /participations/{participationId} {
-      allow get, list: if autenticado();
+      allow get, list: if podeVer();
       allow write: if ehAdmin();
     }
   }

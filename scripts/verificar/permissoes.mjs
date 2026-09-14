@@ -18,7 +18,7 @@
  * e o teste conclui que a regra está aberta quando ela está fechada. Todo
  * valor daqui é escolhido para ser diferente do que está gravado.
  */
-import { db } from "../firebase-admin-app.mjs";
+import { auth, db } from "../firebase-admin-app.mjs";
 import { BUCKET, FIRESTORE } from "./ambiente.mjs";
 import { contaDoPapel, entrarComo } from "./sessao.mjs";
 import { criarCaderno } from "./relatorio.mjs";
@@ -213,6 +213,34 @@ export async function rodar() {
     );
   });
 
+  /* ------------------------------------- conta sem vínculo não vê o teatro */
+  /*
+   * A pergunta que o uso público faz: e quem só criou um login?
+   *
+   * Qualquer pessoa cria conta em /cadastro — é assim que o app funciona. O
+   * que essa conta enxerga depende de estar ligada a uma ficha, e é isso que
+   * se testa aqui: o vínculo do participante é desligado por alguns segundos,
+   * as leituras são refeitas, e o vínculo volta no `finally`.
+   *
+   * Desligar de verdade em vez de criar uma conta descartável é de propósito:
+   * conta criada para teste é conta que sobra quando algo dá errado no meio, e
+   * já sobrou uma aqui.
+   */
+  const contaRef = db.collection("users").doc(conta.uid);
+  await comClaimsIntactas(conta.uid, async () => {
+  await comRestauracao(contaRef, ["personId"], async () => {
+    await contaRef.update({ personId: null });
+    // O token não muda, mas as regras leem o documento, não o token.
+    await checar("(sem vínculo) ler o elenco", "negado", listar("people"));
+    await checar("(sem vínculo) ler as peças", "negado", listar("plays"));
+    await checar("(sem vínculo) ler o roteiro", "negado", listar(`plays/${algumaPeca}/lines`));
+    await checar("(sem vínculo) ler os ensaios", "negado", listar("rehearsals"));
+    await checar("(sem vínculo) ler o histórico", "negado", listar("participations"));
+    await checar("(sem vínculo) ler os exercícios", "negado", listar("exercicios"));
+    await checar("(sem vínculo) ler a própria conta", "pode", ler(`users/${conta.uid}`));
+  });
+  });
+
   /* -------------------------------------------------------------- arquivos */
   await checar("subir imagem na pasta de outra pessoa", "negado", subir(`atores/${outraPessoa}/${inedito()}.jpg`));
   await checar("subir capa de peça", "negado", subir(`pecas/${algumaPeca}/${inedito()}.jpg`));
@@ -226,6 +254,34 @@ export async function rodar() {
       (l) => `${l.ok ? "ok   " : "FALHA"} ${l.oQue} — esperado ${l.esperado}, obtido ${l.obtido}`,
     ),
   };
+}
+
+/**
+ * Garante que as claims do token voltem ao que o documento diz, no fim.
+ *
+ * Mexer em `users/{uid}` dispara `sincronizarClaims`, que é assíncrono e mora
+ * fora daqui. Enquanto ele não roda — ou se ele falhar —, o token fica
+ * descrevendo um estado que o documento já não tem, e é o token que decide se
+ * a pessoa pode trocar a própria foto. Quem mexe arruma: o teste não termina
+ * deixando alguém sem conseguir enviar foto.
+ *
+ * Isto não é zelo hipotético. A primeira versão deste teste deixou a claim de
+ * um participante nula, o gatilho não recuperou sozinho, e foi assim que se
+ * descobriu que ele perdia corridas — o defeito de verdade que este bloco
+ * agora protege contra.
+ */
+async function comClaimsIntactas(uid, acao) {
+  try {
+    await acao();
+  } finally {
+    const dados = (await db.collection("users").doc(uid).get()).data() ?? {};
+    const desejado = { role: dados.role ?? "participante", personId: dados.personId ?? null };
+    const usuario = await auth.getUser(uid);
+    const atual = usuario.customClaims ?? {};
+    if (atual.role !== desejado.role || (atual.personId ?? null) !== desejado.personId) {
+      await auth.setCustomUserClaims(uid, { ...atual, ...desejado });
+    }
+  }
 }
 
 /**
