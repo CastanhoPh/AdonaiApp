@@ -24,14 +24,38 @@
 import {
   deleteObject,
   getDownloadURL,
+  listAll,
   ref,
   uploadBytesResumable,
   type StorageError,
 } from "firebase/storage";
 import { storage } from "./firebase";
 
-export function caminhoDaFotoDoAtor(personId: string): string {
-  return `atores/${personId}/perfil.jpg`;
+/**
+ * O nome de quem é a imagem, em forma de nome de arquivo.
+ *
+ * Sem acento, minúsculo e com hífen no lugar do espaço. Serve para quem abre o
+ * Storage reconhecer o arquivo sem precisar traduzir id nenhum.
+ *
+ * Note que isto **não** entra no nome da pasta. A pasta continua sendo o id,
+ * porque é ela que a regra de segurança compara com o token para decidir quem
+ * pode trocar a foto — e identificador que sustenta permissão não pode depender
+ * de como alguém se chama hoje. Aqui é só rótulo.
+ */
+export function paraNomeDeArquivo(texto: string, reserva: string): string {
+  const limpo = (texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  // Nome só de símbolos, ou vazio, cairia num arquivo chamado "" — daí a reserva.
+  return limpo || reserva;
+}
+
+export function caminhoDaFotoDoAtor(personId: string, nome: string): string {
+  return `atores/${personId}/${paraNomeDeArquivo(nome, "perfil")}.jpg`;
 }
 
 /**
@@ -42,16 +66,40 @@ export function caminhoDaFotoDoAtor(personId: string): string {
  * baixar 216 kB para desenhar 28 pixels é o que fazia a tela de Pessoas
  * demorar a completar no 4G.
  */
-export function caminhoDaMiniaturaDoAtor(personId: string): string {
-  return `atores/${personId}/perfil-mini.jpg`;
+export function caminhoDaMiniaturaDoAtor(personId: string, nome: string): string {
+  return `atores/${personId}/${paraNomeDeArquivo(nome, "perfil")}-mini.jpg`;
 }
 
-export function caminhoDaCapaDaPeca(playId: string): string {
-  return `pecas/${playId}/capa.jpg`;
+export function caminhoDaCapaDaPeca(playId: string, titulo: string): string {
+  return `pecas/${playId}/${paraNomeDeArquivo(titulo, "capa")}.jpg`;
 }
 
-export function caminhoDaFotoDoPersonagem(playId: string, characterId: string): string {
-  return `pecas/${playId}/${characterId}/foto.jpg`;
+export function caminhoDaFotoDoPersonagem(
+  playId: string,
+  characterId: string,
+  nome: string,
+): string {
+  return `pecas/${playId}/${characterId}/${paraNomeDeArquivo(nome, "foto")}.jpg`;
+}
+
+/**
+ * Apaga os arquivos que estão diretamente na pasta, sem entrar nas de dentro.
+ *
+ * Com o nome no arquivo, o caminho deixou de ser fixo: trocar a foto depois de
+ * uma renomeação escreveria num arquivo novo e deixaria o antigo ocupando
+ * espaço para sempre. Cada pasta aqui guarda a imagem de uma coisa só, então
+ * limpar antes de subir mantém a promessa de "uma imagem atual por pasta".
+ *
+ * Não desce nas subpastas de propósito: a pasta de uma peça contém as pastas
+ * dos personagens, e a capa não tem nada a ver com elas.
+ */
+export async function limparPasta(prefixo: string): Promise<void> {
+  try {
+    const { items } = await listAll(ref(storage, prefixo));
+    await Promise.all(items.map((item) => deleteObject(item).catch(() => {})));
+  } catch {
+    // Sem permissão de listagem ou pasta inexistente: nada a limpar.
+  }
 }
 
 /** Maior lado da imagem depois do redimensionamento, por tipo de uso. */

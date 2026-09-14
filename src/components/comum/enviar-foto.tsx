@@ -13,7 +13,12 @@
  */
 import { useRef, useState } from "react";
 import { Camera, Trash, UploadSimple } from "@phosphor-icons/react";
-import { enviarImagem, problemaComOArquivo, removerImagem } from "@/lib/armazenamento";
+import {
+  enviarImagem,
+  limparPasta,
+  problemaComOArquivo,
+  removerImagem,
+} from "@/lib/armazenamento";
 import { Aviso, Botao, juntar } from "../ui";
 
 export function EnviarFoto({
@@ -21,6 +26,7 @@ export function EnviarFoto({
   atual,
   ladoMaximo,
   miniatura,
+  pasta,
   formato = "circulo",
   rotulo = "Escolher foto",
   onEnviada,
@@ -41,6 +47,15 @@ export function EnviarFoto({
    * gerar a pequena depois obrigaria a baixar de volta a grande.
    */
   miniatura?: { caminho: string; lado: number };
+  /**
+   * Pasta que guarda a imagem desta coisa e de mais nada.
+   *
+   * Quando informada, o que estiver nela é apagado antes do envio. O nome do
+   * arquivo passou a carregar o nome de quem é a imagem, então ele muda quando
+   * a pessoa ou a peça é renomeada — e sem esta limpeza a versão antiga ficaria
+   * ocupando espaço para sempre, invisível.
+   */
+  pasta?: string;
   formato?: "circulo" | "retangulo";
   rotulo?: string;
   onEnviada: (url: string, miniUrl?: string) => void | Promise<void>;
@@ -80,6 +95,7 @@ export function EnviarFoto({
     setProgresso(0);
     setEnviando(true);
     try {
+      if (pasta) await limparPasta(pasta);
       const { url } = await enviarImagem(caminho, arquivo, {
         ladoMaximo,
         aoProgredir: setProgresso,
@@ -102,8 +118,13 @@ export function EnviarFoto({
     setErro(null);
     setEnviando(true);
     try {
-      await removerImagem(caminho);
-      if (miniatura) await removerImagem(miniatura.caminho);
+      // Limpa a pasta inteira: o arquivo pode ter sido gravado com o nome
+      // anterior, e aí `caminho` já não aponta para ele.
+      if (pasta) await limparPasta(pasta);
+      else {
+        await removerImagem(caminho);
+        if (miniatura) await removerImagem(miniatura.caminho);
+      }
       await onRemovida();
       setPrevia(null);
     } catch (e) {

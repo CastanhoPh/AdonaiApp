@@ -402,7 +402,8 @@ export function AbaPersonagens({
               */}
             {editandoId ? (
               <EnviarFoto
-                caminho={caminhoDaFotoDoPersonagem(playId, editandoId)}
+                caminho={caminhoDaFotoDoPersonagem(playId, editandoId, form.nome)}
+                pasta={`pecas/${playId}/${editandoId}/`}
                 atual={form.imagemUrl}
                 ladoMaximo={LADO_CENA}
                 formato="retangulo"

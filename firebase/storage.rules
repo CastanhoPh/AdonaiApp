@@ -2,9 +2,15 @@ rules_version = '2';
 
 // Arquivos do AdonaiApp.
 //
-//   atores/{personId}/perfil.jpg              foto de quem faz parte do grupo
-//   pecas/{playId}/capa.jpg                   capa da peça
-//   pecas/{playId}/{characterId}/foto.jpg      imagem do personagem
+//   atores/{personId}/pedro-castanho.jpg           foto de quem faz parte do grupo
+//   atores/{personId}/pedro-castanho-mini.jpg      a mesma, pequena, para as listas
+//   pecas/{playId}/jardim-secreto.jpg              capa da peça
+//   pecas/{playId}/{characterId}/carioca.jpg        imagem do personagem
+//
+// A pasta é o id; o arquivo leva o nome. O id na pasta é o que a regra compara
+// com o token para decidir quem troca o quê — identificador que sustenta
+// permissão não pode depender de como alguém se chama hoje. O nome no arquivo
+// é só rótulo, para quem abre o Storage reconhecer o que está vendo.
 //
 // Leitura para quem está autenticado: o elenco precisa ver os rostos uns dos
 // outros na convocação e no elenco da peça.
@@ -46,7 +52,8 @@ service firebase.storage {
 
     match /atores/{personId}/{arquivo=**} {
       allow read: if autenticado();
-      // `personId` no caminho é o que amarra a foto a quem pode trocá-la.
+      // `personId` na PASTA é o que amarra a foto a quem pode trocá-la. O nome
+      // do arquivo não entra nesta conta: `{arquivo=**}` aceita qualquer um.
       allow write: if imagemAceitavel() && (ehAdmin() || ehAPropriaPessoa(personId));
       allow delete: if ehAdmin() || ehAPropriaPessoa(personId);
     }

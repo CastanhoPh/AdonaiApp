@@ -144,8 +144,14 @@ export default function Perfil() {
         ) : editando === "foto" ? (
           <div className="mt-4 space-y-3 border-t border-stroke-frame pt-4">
             <EnviarFoto
-              caminho={caminhoDaFotoDoAtor(pessoa.id)}
-              miniatura={{ caminho: caminhoDaMiniaturaDoAtor(pessoa.id), lado: LADO_MINIATURA }}
+              caminho={caminhoDaFotoDoAtor(pessoa.id, pessoa.nome)}
+              miniatura={{
+                caminho: caminhoDaMiniaturaDoAtor(pessoa.id, pessoa.nome),
+                lado: LADO_MINIATURA,
+              }}
+              // A pasta guarda só a foto desta pessoa: limpar antes evita que
+              // uma troca de nome deixe o arquivo antigo para trás.
+              pasta={`atores/${pessoa.id}/`}
               atual={pessoa.fotoUrl}
               rotulo="Escolher da galeria"
               onEnviada={guardarFoto}

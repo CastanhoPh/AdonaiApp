@@ -344,8 +344,12 @@ function ConteudoPerfil() {
                   * apontando para ela.
                   */}
                 <EnviarFoto
-                  caminho={caminhoDaFotoDoAtor(id)}
-                  miniatura={{ caminho: caminhoDaMiniaturaDoAtor(id), lado: LADO_MINIATURA }}
+                  caminho={caminhoDaFotoDoAtor(id, pessoa.nome)}
+                  miniatura={{
+                    caminho: caminhoDaMiniaturaDoAtor(id, pessoa.nome),
+                    lado: LADO_MINIATURA,
+                  }}
+                  pasta={`atores/${id}/`}
                   atual={form.fotoUrl}
                   onEnviada={(url, miniUrl) => salvarFoto(url, miniUrl)}
                   onRemovida={() => salvarFoto("", "")}

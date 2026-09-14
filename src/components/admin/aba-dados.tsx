@@ -176,7 +176,9 @@ export function AbaDados({
           <Campo etiqueta="Capa da peça">
             {/* Grava na hora: o arquivo já subiu, ver aba-personagens. */}
             <EnviarFoto
-              caminho={caminhoDaCapaDaPeca(peca.id)}
+              caminho={caminhoDaCapaDaPeca(peca.id, peca.titulo)}
+              // Só a capa fica solta nesta pasta; as dos personagens ficam nas de dentro.
+              pasta={`pecas/${peca.id}/`}
               atual={form.capaUrl}
               ladoMaximo={LADO_CENA}
               formato="retangulo"
