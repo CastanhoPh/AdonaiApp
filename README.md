@@ -671,6 +671,57 @@ leva meio segundo e antes segurava a primeira pintura — o app ficava em branco
 esperando saber uma coisa que já sabia. Quando a confirmação chega e desmente o
 retrato, o que está na tela é trocado.
 
+## Verificação
+
+```bash
+npm run verificar                 # tudo, ~70 segundos
+npm run verificar -- dados        # só uma parte
+npm run verificar -- telas --detalhe
+```
+
+Quatro verificações, em ordem de custo:
+
+| | O que confere |
+| --- | --- |
+| `dados` | o que aponta para o que: escalação, histórico, contas, claims, convites, e se algum campo pessoal voltou para a ficha pública |
+| `permissoes` | 29 linhas de "um participante pode/não pode", no Firestore e no Storage |
+| `imagens` | toda URL guardada responde, toda imagem tem versão pequena, e a lista baixa a pequena |
+| `telas` | abre as 22 telas nos dois papéis e escuta erro de console, exceção, tela vazia e desvio |
+
+Sai com 0 quando não há nada grave e 1 quando há — dá para pôr antes do deploy.
+
+### Por que testa a produção, e o que isso exige
+
+Não há emulador aqui de propósito. As três coisas que já quebraram de verdade
+neste projeto — uma regra recusando uma gravação legítima, uma URL de imagem
+apontando para arquivo que não existe mais, uma tela abrindo em branco por falta
+de permissão — só acontecem com as regras publicadas, os dados reais e o site
+publicado. Emulador teria passado nas três.
+
+O preço é uma regra rígida: **nada aqui escreve em dado de ninguém.** As
+verificações leem, e as gravações que tentam são as que **devem** falhar —
+gravação negada não muda nada. Há um único ponto que precisa gravar um valor
+diferente de verdade (a regra de `ativo`); ele lê o original antes e o devolve
+num `finally`, aconteça o que acontecer.
+
+Três armadilhas estão codificadas ali, cada uma porque já custou caro:
+
+- **Gravação que não muda nada passa de graça.** As regras usam
+  `diff().affectedKeys().hasOnly([...])`, e uma gravação que põe o valor que já
+  estava não afeta chave nenhuma — `hasOnly` de lista vazia é sempre verdadeiro.
+  Todo valor testado é escolhido para ser diferente do que está gravado.
+- **"Deveria poder e foi negado" é tão grave quanto o contrário.** Regra
+  apertada demais quebra o app em silêncio: foi um campo faltando na lista que
+  fez o Firestore recusar a gravação inteira da troca de foto, sem erro visível.
+- **A tela precisa assentar antes de ser medida.** O app é exportado estático,
+  então o HTML já chega com a moldura desenhada — olhar uma vez só aprovaria
+  uma tela que ainda ia virar esqueleto vazio. A verificação exige meio segundo
+  seguido sem esqueleto e com texto.
+
+A sessão dos testes é emitida na hora pelo Admin SDK e descartada no fim. **Não
+existe arquivo de sessão em disco** — a versão anterior guardava um, e ele
+acabou num commit público, o que obrigou a revogar as sessões de duas contas.
+
 ## Comandos
 
 | Comando             | O que faz                                        |
@@ -681,6 +732,7 @@ retrato, o que está na tela é trocado.
 | `npm run deploy`    | build e publicação no Firebase Hosting           |
 | `npm run typecheck` | verificação de tipos                             |
 | `npm run lint`      | ESLint                                           |
+| `npm run verificar` | dados, permissões, imagens e telas contra o que está no ar |
 | `npm run admin`     | cria ou promove uma conta a administrador        |
 | `npm run participante` | cria uma conta de participante                |
 | `npm run convite`   | gera o convite de primeiro acesso de alguém      |
@@ -737,9 +789,11 @@ e relatórios.
 
 Fora do briefing, o que o projeto deve a si mesmo:
 
-- **Não existe teste automatizado.** É a maior lacuna. Foi o que deixou passar
-  um campo faltando na lista das regras do Firestore, que quebrou a troca de
-  foto sem nenhum erro aparecer — o arquivo subia e a ficha não atualizava.
+- A verificação (`npm run verificar`) cobre dados, permissões, imagens e a
+  abertura de todas as telas. **Não cobre fluxo com gravação** — criar peça,
+  escalar alguém, publicar roteiro, resgatar convite. Isso continua conferido à
+  mão, porque testar gravação exige um lugar para gravar que não seja a
+  produção.
 - Ensaio apagado não limpa as presenças que ficaram embaixo dele.
 - As funções de convite não têm limite de tentativa. O código tem 8 caracteres
   e vale 7 dias, então adivinhar é caro, mas o teto não existe.
