@@ -133,6 +133,7 @@ export async function rodar() {
   );
   await checar("ler observações da direção sobre outra pessoa", "negado", ler(`people/${outraPessoa}/privado/direcao`));
   await checar("ler a contagem de tentativas do convite", "negado", listar("limites"));
+  await checar("ler a agenda de indisponibilidade de todos", "negado", listar("indisponibilidades"));
   await checar("criar exercício", "negado", gravar(`exercicios/${inedito()}`, { nome: texto("x") }));
   await checar("criar convite", "negado", gravar(`convites/${inedito()}`, { codigo: texto("x") }));
   await checar("criar aviso", "negado", gravar(`avisos/${inedito()}`, { titulo: texto("x") }));
@@ -212,6 +213,21 @@ export async function rodar() {
       }),
     );
   });
+
+  /*
+   * Avisar que não pode é do próprio: no nome de outro seria poder tirar
+   * alguém de um ensaio sem que ele saiba.
+   */
+  await checar(
+    "avisar indisponibilidade no nome de outra pessoa",
+    "negado",
+    gravar(`indisponibilidades/${inedito()}`, {
+      personId: texto(outraPessoa),
+      personNome: texto("Invadido"),
+      de: texto("2030-01-01"),
+      ate: texto("2030-01-02"),
+    }),
+  );
 
   /* ------------------------------------- conta sem vínculo não vê o teatro */
   /*

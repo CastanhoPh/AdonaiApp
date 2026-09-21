@@ -238,7 +238,7 @@ export function AbaDados({
           {peca.status === "concluida" ? (
             <Tag tom="positivo">Concluída</Tag>
           ) : peca.atual ? (
-            <Tag tom="areia">Peça atual</Tag>
+            <Tag tom="areia">Em cartaz</Tag>
           ) : (
             <Tag>Fora de cartaz</Tag>
           )}

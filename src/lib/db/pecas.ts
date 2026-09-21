@@ -1,7 +1,6 @@
 import {
   collection,
   doc,
-  limit,
   query,
   setDoc,
   updateDoc,
@@ -49,10 +48,34 @@ export async function buscarPeca(id: string): Promise<Play | null> {
 }
 
 /** Apenas uma peça é a atual; a consulta devolve a primeira marcada. */
+/**
+ * As peças que o elenco vê agora. Pode ser mais de uma.
+ *
+ * `atual` deixou de significar "a peça" e passou a significar "esta está em
+ * cartaz para o elenco". Natal e Páscoa se preparam em paralelo, e o grupo é o
+ * mesmo — com uma peça só, marcar a segunda apagava a primeira da tela de
+ * quem ainda ensaiava para ela.
+ *
+ * A ordem é a da apresentação mais próxima primeiro: é a que tem menos tempo
+ * e mais urgência, e é a que o app abre por padrão.
+ */
+export async function listarPecasEmCartaz(): Promise<Play[]> {
+  const snap = await getDocs(query(collection(db, "plays"), where("atual", "==", true)));
+  return snap.docs
+    .map((d) => comId<Play>(d))
+    .sort((a, b) => (a.dataApresentacao || "9999").localeCompare(b.dataApresentacao || "9999"));
+}
+
+/**
+ * A primeira peça em cartaz, para as telas que só sabem lidar com uma.
+ *
+ * O painel da direção, a composição de aviso e o perfil administrativo mostram
+ * "a peça do momento" como contexto, não como escolha — e ganhar um seletor em
+ * cada um deles seria complicar três telas para um caso que o elenco resolve
+ * na dele.
+ */
 export async function buscarPecaAtual(): Promise<Play | null> {
-  const snap = await getDocs(query(collection(db, "plays"), where("atual", "==", true), limit(1)));
-  const primeiro = snap.docs[0];
-  return primeiro ? comId<Play>(primeiro) : null;
+  return (await listarPecasEmCartaz())[0] ?? null;
 }
 
 /** Campos que quem cria a peça informa; o resto nasce com valor padrão. */
@@ -118,18 +141,16 @@ export async function atualizarPeca(id: string, dados: Partial<Play>): Promise<v
  * Marca a peça como atual e desmarca todas as outras — garante a regra de que
  * somente uma peça é considerada a peça atual.
  */
-export async function definirPecaAtual(id: string): Promise<void> {
-  const todas = await getDocs(collection(db, "plays"));
-  const lote = writeBatch(db);
-  let mudou = false;
-  todas.docs.forEach((d) => {
-    const deveSerAtual = d.id === id;
-    if (Boolean(d.data().atual) !== deveSerAtual) {
-      lote.update(d.ref, { atual: deveSerAtual });
-      mudou = true;
-    }
-  });
-  if (mudou) await lote.commit();
+/**
+ * Põe ou tira uma peça de cartaz, sem mexer nas outras.
+ *
+ * Antes isto desmarcava todas as demais: só podia haver uma. Duas produções em
+ * paralelo é o normal de um grupo de igreja — Natal e Páscoa, uma peça de
+ * congresso no meio —, e com a exclusividade a direção tinha de escolher qual
+ * metade do elenco ficava sem ver o próprio roteiro.
+ */
+export async function definirPecaAtual(id: string, emCartaz = true): Promise<void> {
+  await updateDoc(doc(db, "plays", id), { atual: emCartaz });
 }
 
 /**

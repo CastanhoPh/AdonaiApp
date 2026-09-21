@@ -4,12 +4,14 @@ Aplicativo web do teatro da **Igreja Aliança**: centraliza integrantes, peças,
 personagens, elenco, roteiro e ensaios em um só lugar. A interface é pensada
 primeiro para o celular.
 
-- **Participante** — vê seu personagem, lê o roteiro com as próprias falas
-  destacadas, consulta os ensaios, faz os exercícios de teatro que a direção
-  indica e consulta o histórico de peças.
+- **Participante** — vê seu personagem e a ficha de interpretação dele, lê o
+  roteiro com as próprias falas destacadas (e pode escondê-las para decorar),
+  consulta ensaios e apresentações, avisa quando não vai poder, faz os
+  exercícios de teatro que a direção indica e consulta o histórico de peças.
 - **Direção (administrador)** — cadastra pessoas e características, convida
-  quem ainda não tem acesso, cria peças e personagens, monta o elenco, escreve
-  e publica o roteiro, marca os ensaios, manda avisos e cadastra os exercícios.
+  quem ainda não tem acesso, cria peças e personagens, monta o elenco, importa
+  e publica o roteiro, marca ensaios e apresentações, manda avisos e cadastra
+  os exercícios.
 
 ## Tecnologias
 
@@ -304,6 +306,63 @@ de quem vai assistir. [`src/lib/youtube.ts`](src/lib/youtube.ts) extrai o id do
 endereço — aceita `youtube.com/watch`, `youtu.be` e `/shorts/` — e monta a capa
 a partir dele, que é a única coisa que a lista baixa do YouTube.
 
+## Ensaio e apresentação são o mesmo documento
+
+`rehearsals/{id}` guarda os dois, separados por `tipo`. A apresentação era um
+par de campos na peça — `dataApresentacao` e `local`, no singular. Peça que
+sobe duas vezes, ou que estreia num culto e repete num congresso, não cabia; e
+o que a apresentação precisa — data, hora, local, quem vai, quem confirmou — o
+ensaio já tinha inteiro.
+
+Coleção paralela teria obrigado a reescrever convocação, confirmação de
+presença, o lembrete das 7h30 e o alvo "convocados" dos avisos do lado dela.
+Aqui vieram de graça. O nome da coleção ficou `rehearsals` porque renomear
+coleção no Firestore é copiar tudo e apagar, e o ganho seria de leitura de
+código, não de comportamento.
+
+`plays.dataApresentacao` e `plays.local` continuam existindo — é o que o acervo
+mostra e o que o histórico copia —, mas deixaram de ser digitados: a
+apresentação mais próxima os preenche. Eram dois lugares para o mesmo fato, e
+divergiam no dia em que a apresentação mudava de data.
+
+### Ensaiar um trecho
+
+Um ensaio pode dizer que cenas cobre (`trechos`), e aí **"convocar quem fala
+nessas cenas"** lê o roteiro e monta a convocação. Sem isso, marcar um ensaio
+de uma cena e chamar o elenco inteiro é o caminho mais curto — conferir quem
+fala ali dá mais trabalho que chamar todos —, e quinze pessoas atravessam a
+cidade para assistir a três ensaiarem.
+
+Trecho vazio significa a peça inteira, e não "todo mundo": confundir os dois
+faria um ensaio geral nascer com a convocação congelada de quem falava no dia
+em que foi marcado.
+
+### Avisar antes que não pode
+
+A confirmação de presença é reativa: a direção marca, o elenco responde, e só
+então se descobre que metade não pode — e remarca. Em **Ensaios**, cada um
+registra os dias em que já sabe que não vai; ao marcar, a direção vê quem entre
+os convocados avisou, e o motivo.
+
+Fica em `indisponibilidades`, fora de `people`, porque a direção consulta por
+data e um documento por pessoa obrigaria a ler o cadastro inteiro para montar a
+agenda de um dia. Lê quem escreveu e a direção: o motivo é assunto de quem
+escreveu, e a agenda de cada um não é informação que o grupo precise.
+
+## Mais de uma peça em cartaz
+
+`plays.atual` deixou de significar "a peça" e passa a significar "esta está em
+cartaz para o elenco" — e pode haver várias. Natal e Páscoa se preparam em
+paralelo, o grupo é o mesmo, e com uma peça só marcar a segunda apagava a
+primeira da tela de quem ainda ensaiava para ela.
+
+O custo disso é de interface, não de dado: toda tela do elenco passa a ter que
+responder "qual peça?". A saída foi **não perguntar quando não há escolha**: o
+seletor só aparece com duas ou mais em cartaz, que é o caso raro. A escolha
+vale para Início, Roteiro e Ensaios de uma vez — peça é o contexto inteiro, não
+um filtro de uma tela — e fica guardada no aparelho, caindo para a de
+apresentação mais próxima quando a escolhida sai de cartaz.
+
 ## Roteiro
 
 Cada linha é um documento: ato, cena, ordem dentro da cena, tipo (fala,
@@ -321,6 +380,35 @@ inteiro.
 Atos e cenas têm título próprio ("Ato II — A espera"), guardados repetidos nas
 linhas: não existe coleção separada de atos e cenas, e por isso toda cena nasce
 junto com a primeira linha dela.
+
+### Modo decoreba
+
+O roteiro já sabe quais falas são de quem — é o que faz o destaque. O botão do
+olho usa isso ao contrário: cobre as falas da pessoa com uma tarja, e cada
+toque revela uma, com a conta de quantas faltam.
+
+A tarja ocupa o espaço da fala em vez de apagá-la: ver o tamanho do que vem faz
+parte de decorar, e texto que some faria a cena encolher e mudar de lugar a
+cada toque. Sair e voltar recomeça — a segunda passada com tudo aberto não
+serviria para nada. E, ao contrário do tamanho da letra, **não fica guardado**:
+ninguém quer abrir o roteiro no meio do ensaio e encontrar as próprias falas
+escondidas sem ter pedido.
+
+### Ficha de interpretação
+
+Cada personagem tem campos próprios para idade, personalidade, como fala, o que
+quer, arco, relações e referências — e o ator escalado lê tudo em **Meu
+personagem**.
+
+Isso cabia em `descricao` e `observacoes`, dois textos livres, com o resultado
+previsível: a direção escrevia o que lembrava, na ordem que vinha, e cada
+personagem tinha uma coisa diferente. Campo com nome é pergunta feita — quem
+preenche vê o que falta. Tudo opcional, porque figuração não precisa de arco, e
+campo vazio não aparece para o ator.
+
+Não confundir com `caracteristicasDesejadas`, que é o oposto: aquilo é
+avaliação de quem serve para o papel, mora fora do documento e o participante
+não lê.
 
 ### Importar de um arquivo
 
@@ -536,6 +624,7 @@ esquece. Ele fica de fora do `index.ts`: é interno.
 | `exercicios/{id}`                    | exercício de teatro: nome, objetivo, link, ordem | todo o elenco |
 | `avisos/{id}`                        | aviso composto pela direção e o resultado da entrega | só a direção |
 | `convites/{codigo}`                  | convite de primeiro acesso, ligado a uma ficha | **ninguém pelo cliente** — só a direção escreve, e a função lê |
+| `indisponibilidades/{id}`            | quando alguém avisou que não pode, antes de a direção marcar | a própria pessoa e a direção |
 | `limites/{chave}`                    | tentativas por origem nas funções abertas      | **ninguém pelo cliente** — só o servidor |
 
 Datas de ensaio e apresentação são guardadas como texto `AAAA-MM-DD`, o que
@@ -952,6 +1041,8 @@ e relatórios.
 
 Fora do briefing, o que o projeto deve a si mesmo:
 
+- A outra metade do roteiro de "Quem Deus Diz que Somos III" (o elenco
+  masculino) ainda não foi importada.
 - A verificação cobre o que o participante grava na própria ficha, mas **não
   os fluxos da direção** — criar peça, escalar alguém, publicar roteiro,
   concluir, resgatar convite. Esses continuam conferidos à mão, porque exercer

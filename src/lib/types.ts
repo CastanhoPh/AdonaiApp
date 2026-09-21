@@ -306,11 +306,51 @@ export const ROLE_TYPE_LABEL: Record<RoleType, string> = {
 };
 
 /** Personagem de uma peça. Documento em `plays/{playId}/characters/{characterId}`. */
+/**
+ * Como o personagem é, para quem vai interpretá-lo.
+ *
+ * Isto tudo cabia em `descricao` e `observacoes` — dois textos livres — e o
+ * resultado previsível: a direção escrevia o que lembrava, na ordem que vinha,
+ * e cada personagem tinha uma coisa diferente. Campo com nome é pergunta
+ * feita: quem preenche vê o que falta.
+ *
+ * Não confundir com `caracteristicasDesejadas`, que é o oposto — aquilo é
+ * avaliação de quem serve para o papel, mora fora do documento e o
+ * participante não lê. Isto é material de trabalho do ator, e é para ele que
+ * existe.
+ *
+ * Tudo opcional: personagem de figuração não precisa de arco, e obrigar a
+ * preencher faria a direção escrever qualquer coisa para poder salvar.
+ */
+export interface Interpretacao {
+  /** Quantos anos o personagem tem, que raramente é a idade de quem o faz. */
+  idade?: string;
+  /** "Fala devagar, escolhe as palavras"; "grita quando fica nervoso". */
+  estiloDeFala?: string;
+  personalidade?: string;
+  /** O que ele quer, que é o que move a cena. */
+  motivacao?: string;
+  /** Onde começa e onde chega — o que muda nele do início ao fim. */
+  arco?: string;
+  /** "Irmã mais velha da Amanda, não se falam há dois anos." */
+  relacoes?: string;
+  /** Filme, música, pessoa: o que a direção usa para explicar o tom. */
+  referencias?: string;
+}
+
 export interface Character {
   id: string;
   playId: string;
   nome: string;
   descricao: string;
+  /**
+   * A ficha de interpretação. Ausente nos personagens criados antes dela.
+   *
+   * Mora no próprio documento, e não em subcoleção: quem a lê é justamente
+   * quem já lê o personagem — o ator escalado e a direção —, e separar
+   * custaria uma leitura por personagem em toda tela de elenco.
+   */
+  interpretacao?: Interpretacao;
   tipoPapel: RoleType;
   /** Desejadas para o papel. Fora do documento, como em `Person`. */
   caracteristicasDesejadas?: string[];
@@ -382,10 +422,45 @@ export const REHEARSAL_STATUS_LABEL: Record<RehearsalStatus, string> = {
 };
 
 /** Ensaio. Documento em `rehearsals/{rehearsalId}`. */
+export const ENCONTRO_TIPOS = ["ensaio", "apresentacao"] as const;
+export type EncontroTipo = (typeof ENCONTRO_TIPOS)[number];
+
+export const ENCONTRO_TIPO_LABEL: Record<EncontroTipo, string> = {
+  ensaio: "Ensaio",
+  apresentacao: "Apresentação",
+};
+
+/** Um trecho da peça: o ato e a cena. */
+export interface TrechoDaPeca {
+  ato: number;
+  cena: number;
+}
+
+/**
+ * Um encontro marcado: ensaio ou apresentação.
+ *
+ * A apresentação era um par de campos na peça — `dataApresentacao` e `local`,
+ * no singular. Peça que sobe duas vezes, ou que estreia num culto e repete num
+ * congresso, não cabia; e o que a apresentação precisa — data, hora, local,
+ * quem vai, quem confirmou — o ensaio já tinha inteiro.
+ *
+ * Por isso é o mesmo documento com um `tipo`, e não uma coleção paralela: com
+ * uma coleção nova, convocação, confirmação de presença, o lembrete das 7h30 e
+ * o alvo "convocados" dos avisos teriam de ser reescritos do lado dela. Aqui
+ * vieram de graça.
+ *
+ * Documento em `rehearsals/{id}` — o nome da coleção ficou, porque renomear
+ * coleção no Firestore é copiar tudo e apagar, e o ganho seria de leitura de
+ * código, não de comportamento.
+ */
 export interface Rehearsal {
   id: string;
   playId: string;
   playTitulo: string;
+  /** Ausente nos documentos criados antes da distinção: eram todos ensaio. */
+  tipo?: EncontroTipo;
+  /** Só em apresentação: "Culto de Natal", "Congresso de Jovens". */
+  nomeEvento?: string;
   /** `YYYY-MM-DD`. */
   data: string;
   horaInicio: string;
@@ -395,8 +470,39 @@ export interface Rehearsal {
   todos: boolean;
   /** Ids de pessoas convocadas, usado quando `todos` é falso. */
   convocados: string[];
+  /**
+   * Que trechos da peça este encontro cobre. Vazio significa a peça inteira.
+   *
+   * Um ensaio de "ato 2, cena 3" muda quem precisa ir: quem não fala naquelas
+   * cenas não tem o que fazer ali. A tela usa isto para sugerir a convocação a
+   * partir do roteiro, em vez de a direção marcar nome por nome.
+   */
+  trechos?: TrechoDaPeca[];
   observacoes: string;
   status: RehearsalStatus;
+}
+
+/**
+ * Quando alguém avisa que não pode, antes de a direção marcar.
+ *
+ * Documento em `indisponibilidades/{id}`. Inverte a presença, que é reativa —
+ * a direção marca, e só então se descobre quem não pode e remarca. Avisar
+ * antes é o que evita a remarcação.
+ *
+ * Fica fora de `people` porque a direção precisa consultar por data, e um
+ * documento por pessoa obrigaria a ler o cadastro inteiro para montar a agenda
+ * de um dia.
+ */
+export interface Indisponibilidade {
+  id: string;
+  personId: string;
+  personNome: string;
+  /** `YYYY-MM-DD`, inclusive nas duas pontas. Um dia só repete a data. */
+  de: string;
+  ate: string;
+  /** Opcional: "prova na faculdade". A direção lê, o elenco não. */
+  motivo?: string;
+  criadoEm: string;
 }
 
 export const PRESENCA_ESTADOS = ["confirmado", "ausente"] as const;

@@ -142,6 +142,17 @@ export default function MeusPersonagens() {
   );
 }
 
+/** Os campos da ficha e como cada um se chama na tela do ator. */
+const ROTULOS_DA_FICHA: [keyof NonNullable<Character["interpretacao"]>, string][] = [
+  ["idade", "Idade do personagem"],
+  ["personalidade", "Personalidade"],
+  ["estiloDeFala", "Como fala"],
+  ["motivacao", "O que ele quer"],
+  ["arco", "Arco"],
+  ["relacoes", "Relações"],
+  ["referencias", "Referências"],
+];
+
 function BlocoDoPapel({
   papel,
   tituloDaPeca,
@@ -155,6 +166,16 @@ function BlocoDoPapel({
   cenasDaPeca: number;
   mostrarPeca: boolean;
 }) {
+  /*
+   * Só o que a direção preencheu, na ordem de quem monta um personagem.
+   *
+   * A ordem é a mesma do formulário da direção, e é deliberada: quem é, como
+   * fala, o que quer, para onde vai, com quem, e por fim as referências.
+   */
+  const daInterpretacao = ROTULOS_DA_FICHA.map(
+    ([chave, etiqueta]) => [etiqueta, (papel.interpretacao?.[chave] ?? "").trim()] as const,
+  ).filter(([, texto]) => texto.length > 0);
+
   return (
     <section className="mb-6">
       <Cartao className="relative mb-4 overflow-hidden bg-surface-raised">
@@ -206,6 +227,27 @@ function BlocoDoPapel({
           {papel.descricao || "A direção ainda não escreveu a descrição do personagem."}
         </p>
       </div>
+
+      {/*
+        * A ficha de interpretação, quando a direção preencheu.
+        *
+        * Vem logo abaixo da descrição porque é o que o ator abre esta tela
+        * para ler: descrição diz quem o personagem é para a peça, a ficha diz
+        * como interpretá-lo. Campo vazio não aparece — meia ficha com títulos
+        * vazios parece abandono, e uma linha só bem escrita já serve.
+        */}
+      {daInterpretacao.length > 0 ? (
+        <div className="mb-5 space-y-3.5">
+          {daInterpretacao.map(([etiqueta, texto]) => (
+            <div key={etiqueta}>
+              <Eyebrow>{etiqueta}</Eyebrow>
+              <p className="mt-1.5 text-[15px] leading-[23px] whitespace-pre-line text-ink-body">
+                {texto}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {papel.observacoes ? (
         <div>

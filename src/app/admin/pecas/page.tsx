@@ -135,9 +135,10 @@ function ConteudoPecas() {
     if (ok) setAbertoManual(false);
   }
 
-  async function marcarComoAtual(id: string) {
+  /** Põe ou tira de cartaz, sem mexer nas outras peças. */
+  async function alternarCartaz(peca: Play) {
     await enviar(async () => {
-      await definirPecaAtual(id);
+      await definirPecaAtual(peca.id, !peca.atual);
       await pecas.recarregar();
     });
   }
@@ -188,7 +189,7 @@ function ConteudoPecas() {
                           key={peca.id}
                           peca={peca}
                           enviando={enviando}
-                          onMarcarAtual={() => void marcarComoAtual(peca.id)}
+                          onAlternarCartaz={() => void alternarCartaz(peca)}
                         />
                       ))}
                     </ul>
@@ -240,11 +241,11 @@ function ConteudoPecas() {
 function CartaoDeProducao({
   peca,
   enviando,
-  onMarcarAtual,
+  onAlternarCartaz,
 }: {
   peca: Play;
   enviando: boolean;
-  onMarcarAtual: () => void;
+  onAlternarCartaz: () => void;
 }) {
   return (
     <li>
@@ -278,7 +279,7 @@ function CartaoDeProducao({
               >
                 {peca.titulo}
               </Link>
-              {peca.atual ? <Tag tom="areia">Peça atual</Tag> : null}
+              {peca.atual ? <Tag tom="areia">Em cartaz</Tag> : null}
             </div>
 
             <p className="mt-0.5 text-[13px] leading-5 text-ink-caption">
@@ -303,13 +304,20 @@ function CartaoDeProducao({
               ) : null}
             </div>
 
-            {!peca.atual ? (
-              <div className="mt-3">
-                <Botao variante="ghost" onClick={onMarcarAtual} disabled={enviando}>
-                  Definir como peça atual
-                </Botao>
-              </div>
-            ) : null}
+            {/*
+              * Pôr e tirar de cartaz, sem mexer nas outras.
+              *
+              * Antes marcar uma peça desmarcava todas as demais, e não havia
+              * como tirar de cartaz a não ser marcando outra. Com duas
+              * produções em paralelo — Natal e Páscoa é o normal —, isso
+              * obrigava a escolher qual metade do elenco ficava sem ver o
+              * próprio roteiro.
+              */}
+            <div className="mt-3">
+              <Botao variante="ghost" onClick={onAlternarCartaz} disabled={enviando}>
+                {peca.atual ? "Tirar de cartaz" : "Pôr em cartaz"}
+              </Botao>
+            </div>
           </div>
         </div>
       </Cartao>

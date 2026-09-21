@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowDown, ArrowUp, MagnifyingGlass, TextAa, X } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, Eye, EyeSlash, MagnifyingGlass, TextAa, X } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth-context";
 import { listarFalas } from "@/lib/db";
 import { dataCurta, nomesDaFala, normalizar, rotuloCena } from "@/lib/format";
@@ -10,6 +10,7 @@ import { useAtual } from "@/lib/uso-atual";
 import type { ScriptLine } from "@/lib/types";
 import { ErroCarregamento, TopoAba } from "@/components/shell";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
+import { TrocarPeca } from "@/components/comum/trocar-peca";
 import {
   Abas,
   Botao,
@@ -164,6 +165,35 @@ export default function Roteiro() {
   const [indice, setIndice] = useState(-1);
   const tamanho = useSyncExternalStore(assinarTamanho, lerTamanho, noServidor);
   const [menuAberto, setMenuAberto] = useState(false);
+  /*
+   * Modo decoreba: as falas da pessoa ficam cobertas até ela tocar.
+   *
+   * Não fica guardado de propósito, ao contrário do tamanho da letra. Tamanho
+   * é preferência; isto é exercício, e ninguém quer abrir o roteiro no meio do
+   * ensaio e encontrar as próprias falas escondidas sem ter pedido.
+   */
+  const [decoreba, setDecoreba] = useState(false);
+  const [reveladas, setReveladas] = useState<Set<string>>(new Set());
+
+  function alternarDecoreba() {
+    setDecoreba((ligado) => {
+      // Sair e voltar recomeça o exercício, senão a segunda passada já vem
+      // com tudo aberto e não serve para nada.
+      setReveladas(new Set());
+      return !ligado;
+    });
+    setMenuAberto(false);
+    setBuscaAberta(false);
+  }
+
+  function revelar(id: string) {
+    setReveladas((antes) => {
+      const proximo = new Set(antes);
+      if (proximo.has(id)) proximo.delete(id);
+      else proximo.add(id);
+      return proximo;
+    });
+  }
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [busca, setBusca] = useState("");
   const referencias = useRef(new Map<string, HTMLElement>());
@@ -261,6 +291,13 @@ export default function Roteiro() {
               <MagnifyingGlass size={20} />
             </BotaoIcone>
             <BotaoIcone
+              rotulo={decoreba ? "Sair do modo decoreba" : "Modo decoreba"}
+              onClick={alternarDecoreba}
+              className={decoreba ? "text-brand-strong" : undefined}
+            >
+              {decoreba ? <Eye size={20} /> : <EyeSlash size={20} />}
+            </BotaoIcone>
+            <BotaoIcone
               rotulo="Tamanho da letra"
               onClick={() => {
                 setMenuAberto((v) => !v);
@@ -273,6 +310,8 @@ export default function Roteiro() {
           </>
         }
       />
+
+      <TrocarPeca pecas={atual.dados?.pecas ?? []} escolhida={peca} />
 
       {buscaAberta ? (
         <div className="mb-3 flex items-center gap-2">
@@ -296,6 +335,28 @@ export default function Roteiro() {
               <X size={18} />
             </BotaoIcone>
           ) : null}
+        </div>
+      ) : null}
+
+      {decoreba ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[8px] border border-brand/45 bg-brand/10 px-3 py-2">
+          <span className="text-[13px] leading-5 text-ink-body">
+            {minhasFalas.length === 0
+              ? "Você não tem falas nesta peça."
+              : `${reveladas.size} de ${minhasFalas.length} ${
+                  minhasFalas.length === 1 ? "fala revelada" : "falas reveladas"
+                }`}
+          </span>
+          <div className="flex items-center gap-1">
+            {reveladas.size > 0 ? (
+              <Botao variante="bare" onClick={() => setReveladas(new Set())} className="h-8">
+                Cobrir todas
+              </Botao>
+            ) : null}
+            <Botao variante="ghost" onClick={alternarDecoreba} className="h-8">
+              Sair
+            </Botao>
+          </div>
         </div>
       ) : null}
 
@@ -432,12 +493,43 @@ export default function Roteiro() {
                                     Sua fala
                                   </span>
                                 </div>
-                                <p
-                                  className="font-medium text-ink-heading"
-                                  style={{ lineHeight: 1.5 }}
-                                >
-                                  {fala.texto}
-                                </p>
+                                {decoreba && !reveladas.has(fala.id) ? (
+                                  /*
+                                   * Coberta, não apagada: a tarja ocupa o
+                                   * espaço da fala. Ver o tamanho do que vem
+                                   * faz parte de decorar, e um texto que some
+                                   * faria a cena inteira encolher e mudar de
+                                   * lugar a cada toque.
+                                   */
+                                  <button
+                                    type="button"
+                                    onClick={() => revelar(fala.id)}
+                                    aria-label="Revelar esta fala"
+                                    className="w-full rounded-[6px] border border-dashed border-[color:var(--color-speech-label)]/45 px-2 py-1 text-left transition-colors hover:bg-white/5"
+                                  >
+                                    <span
+                                      aria-hidden
+                                      className="block select-none rounded-[3px] bg-[color:var(--color-speech-label)]/25 font-medium text-transparent"
+                                      style={{ lineHeight: 1.5 }}
+                                    >
+                                      {fala.texto}
+                                    </span>
+                                    <span className="mt-1 block text-[11px] leading-4 text-[color:var(--color-speech-label)]">
+                                      toque para ver
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <p
+                                    className={juntar(
+                                      "font-medium text-ink-heading",
+                                      decoreba && "cursor-pointer",
+                                    )}
+                                    style={{ lineHeight: 1.5 }}
+                                    onClick={decoreba ? () => revelar(fala.id) : undefined}
+                                  >
+                                    {fala.texto}
+                                  </p>
+                                )}
                               </li>
                             );
                           }

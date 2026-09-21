@@ -35,6 +35,9 @@ export function CartaoEnsaio({
   acoes?: ReactNode;
 }) {
   const cancelado = ensaio.status === "cancelado";
+  // Documento antigo não tem `tipo`: naquela época era tudo ensaio.
+  const ehApresentacao = ensaio.tipo === "apresentacao";
+  const trechos = ensaio.trechos ?? [];
 
   return (
     <Cartao
@@ -57,12 +60,34 @@ export function CartaoEnsaio({
             >
               {diaSemanaEHorario(ensaio.data, ensaio.horaInicio, ensaio.horaFim)}
             </p>
-            <StatusEnsaio status={ensaio.status} />
+            <div className="flex items-center gap-1.5">
+              {/*
+                * Apresentação leva etiqueta; ensaio não.
+                *
+                * São o mesmo documento com tipos diferentes, e na lista se
+                * misturam. Marcar os dois deixaria "Ensaio" repetido em quase
+                * toda linha para dizer o que já é o normal — marca-se o que
+                * foge da regra.
+                */}
+              {ehApresentacao ? <Tag tom="areia">Apresentação</Tag> : null}
+              <StatusEnsaio status={ensaio.status} />
+            </div>
           </div>
 
-          {ensaio.local || (mostrarPeca && ensaio.playTitulo) ? (
+          {ensaio.local || ensaio.nomeEvento || (mostrarPeca && ensaio.playTitulo) ? (
             <p className="mt-1 text-[13px] leading-5 text-ink-caption">
-              {[ensaio.local, mostrarPeca ? ensaio.playTitulo : null].filter(Boolean).join(" · ")}
+              {[ensaio.nomeEvento, ensaio.local, mostrarPeca ? ensaio.playTitulo : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
+
+          {trechos.length > 0 ? (
+            <p className="mt-1 text-[12px] leading-[18px] text-ink-caption">
+              Vai ensaiar{" "}
+              {trechos.length === 1
+                ? `o ato ${trechos[0].ato}, cena ${trechos[0].cena}`
+                : `${trechos.length} cenas: ${trechos.map((t) => `${t.ato}·${t.cena}`).join(", ")}`}
             </p>
           ) : null}
 

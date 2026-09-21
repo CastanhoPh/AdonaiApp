@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CalendarDots, CaretRight, Certificate, Scroll } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth-context";
 import {
-  buscarPecaAtual,
+  listarPecasEmCartaz,
   listarPersonagensDaPessoa,
   listarEnsaios,
   listarFalas,
@@ -20,6 +20,7 @@ import {
   primeiroNome,
 } from "@/lib/format";
 import { useCarregar } from "@/lib/hooks";
+import { usePecaEscolhida } from "@/lib/uso-atual";
 import {
   PLAY_STATUS_LABEL,
   ROLE_TYPE_LABEL,
@@ -31,6 +32,7 @@ import { ErroCarregamento, TopoInicio } from "@/components/shell";
 import { StatusEnsaio } from "@/components/comum/ensaio-cartao";
 import { ConfirmarPresenca } from "@/components/comum/presenca";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
+import { TrocarPeca } from "@/components/comum/trocar-peca";
 import {
   BlocoData,
   BotaoLink,
@@ -61,6 +63,8 @@ const TOM_PECA = {
 } as const;
 
 interface TelaInicio {
+  /** As peças em cartaz, para o seletor aparecer quando houver mais de uma. */
+  emCartaz: Play[];
   peca: Play | null;
   personagens: Character[];
   ensaios: Rehearsal[];
@@ -70,6 +74,7 @@ interface TelaInicio {
 
 export default function Inicio() {
   const { conta, pessoa } = useAuth();
+  const escolhida = usePecaEscolhida();
 
   /*
    * Um carregamento só, em três passos, em vez de quatro consultas
@@ -79,6 +84,7 @@ export default function Inicio() {
    */
   const tela = useCarregar<TelaInicio>("inicio", async () => {
     const vazio: TelaInicio = {
+      emCartaz: [],
       peca: null,
       personagens: [],
       ensaios: [],
@@ -87,11 +93,18 @@ export default function Inicio() {
     };
     if (!pessoa) return vazio;
 
-    const [peca, participacoes] = await Promise.all([
-      buscarPecaAtual(),
+    const [emCartaz, participacoes] = await Promise.all([
+      listarPecasEmCartaz(),
       listarParticipacoes(pessoa.id),
     ]);
-    if (!peca) return { ...vazio, pecas: participacoes.length };
+    /*
+     * A mesma escolha do resto do elenco, e a mesma regra de queda: a peça
+     * guardada enquanto continuar em cartaz, senão a de apresentação mais
+     * próxima. Sem isso, trocar de peça no Roteiro e voltar ao Início daria
+     * duas respostas diferentes para "qual é a minha peça".
+     */
+    const peca = emCartaz.find((p) => p.id === escolhida) ?? emCartaz[0] ?? null;
+    if (!peca) return { ...vazio, emCartaz, pecas: participacoes.length };
 
     const [personagens, ensaios] = await Promise.all([
       listarPersonagensDaPessoa(peca.id, pessoa.id),
@@ -107,13 +120,14 @@ export default function Inicio() {
       : [];
 
     return {
+      emCartaz,
       peca,
       personagens,
       ensaios,
       pecas: participacoes.length,
       falas: minhas.filter((f) => f.tipo === "fala").length,
     };
-  }, [pessoa?.id]);
+  }, [pessoa?.id, escolhida]);
 
   const peca = tela.dados?.peca ?? null;
   const personagens = tela.dados?.personagens ?? [];
@@ -138,6 +152,8 @@ export default function Inicio() {
   return (
     <div>
       <TopoInicio saudacao={saudacao()} nome={primeiroNome(nome)} />
+
+      <TrocarPeca pecas={tela.dados?.emCartaz ?? []} escolhida={peca} />
 
       {!pessoa ? (
         <SemVinculo />

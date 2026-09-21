@@ -10,7 +10,9 @@ import type { Rehearsal } from "@/lib/types";
 import { ErroCarregamento, TopoAba } from "@/components/shell";
 import { CartaoEnsaio } from "@/components/comum/ensaio-cartao";
 import { ConfirmarPresenca } from "@/components/comum/presenca";
+import { QuandoNaoPosso } from "@/components/comum/quando-nao-posso";
 import { SemVinculo } from "@/components/comum/sem-vinculo";
+import { TrocarPeca } from "@/components/comum/trocar-peca";
 import { Abas, Carregando, Vazio } from "@/components/ui";
 
 type Aba = "proximos" | "anteriores";
@@ -73,6 +75,19 @@ export default function Ensaios() {
   return (
     <div>
       <TopoAba titulo="Ensaios" subtitulo={peca.titulo} />
+
+      <TrocarPeca pecas={atual.dados?.pecas ?? []} escolhida={peca} />
+
+      {/*
+        * Avisar antes fica no topo, acima da lista.
+        *
+        * É a única coisa nesta tela que a pessoa faz *antes* de existir
+        * ensaio marcado — o resto é reagir ao que a direção já decidiu. No pé
+        * da lista ninguém acharia.
+        */}
+      <div className="mb-4">
+        <QuandoNaoPosso pessoa={pessoa} />
+      </div>
 
       <Abas
         className="mb-4"

@@ -5,20 +5,29 @@ import { useSearchParams } from "next/navigation";
 import { BellRinging, Plus } from "@phosphor-icons/react";
 import {
   atualizarEnsaio,
+  cenasDaPeca,
   criarEnsaio,
   listarEnsaios,
+  listarIndisponibilidades,
   listarPecas,
   listarPersonagens,
+  quemFalaNosTrechos,
+  quemNaoPodeEm,
   removerEnsaio,
 } from "@/lib/db";
 import { dataLonga, hojeISO, nomeCurto, pluralizar } from "@/lib/format";
 import { useCarregar, useEnvio } from "@/lib/hooks";
 import {
+  ENCONTRO_TIPOS,
+  ENCONTRO_TIPO_LABEL,
   REHEARSAL_STATUS,
   REHEARSAL_STATUS_LABEL,
+  type EncontroTipo,
+  type Indisponibilidade,
   type Play,
   type Rehearsal,
   type RehearsalStatus,
+  type TrechoDaPeca,
 } from "@/lib/types";
 import { CorpoAdmin, ErroCarregamento, TopoAdmin } from "@/components/shell";
 import { CartaoEnsaio } from "@/components/comum/ensaio-cartao";
@@ -38,6 +47,7 @@ import {
   Modal,
   Selecao,
   Vazio,
+  juntar,
 } from "@/components/ui";
 
 type Aba = "proximos" | "anteriores";
@@ -59,6 +69,9 @@ interface Escalado {
 function formDoEnsaio(ensaio: Rehearsal) {
   return {
     playId: ensaio.playId,
+    tipo: ensaio.tipo ?? ("ensaio" as EncontroTipo),
+    nomeEvento: ensaio.nomeEvento ?? "",
+    trechos: ensaio.trechos ?? [],
     data: ensaio.data,
     horaInicio: ensaio.horaInicio,
     horaFim: ensaio.horaFim,
@@ -73,6 +86,9 @@ function formDoEnsaio(ensaio: Rehearsal) {
 function ensaioVazio(playId: string) {
   return {
     playId,
+    tipo: "ensaio" as EncontroTipo,
+    nomeEvento: "",
+    trechos: [] as TrechoDaPeca[],
     data: "",
     horaInicio: "19:30",
     horaFim: "21:30",
@@ -188,7 +204,69 @@ function ConteudoEnsaios() {
         personagem: p.nome,
       }));
   }, [aberto, playId]);
-  const escalados = elenco.dados ?? [];
+  const escalados = useMemo(() => elenco.dados ?? [], [elenco.dados]);
+
+  /*
+   * As cenas da peça e quem já avisou que não pode.
+   *
+   * Vêm juntas e só com o formulário aberto: são as duas coisas que a direção
+   * precisa no momento de marcar, e nenhuma faz falta enquanto ela só olha a
+   * lista.
+   */
+  const paraMarcar = useCarregar<{ cenas: TrechoDaPeca[]; avisos: Indisponibilidade[] }>(
+    "admin-ensaios-marcar",
+    async () => {
+      if (!aberto || !playId) return { cenas: [], avisos: [] };
+      const [cenas, avisos] = await Promise.all([
+        cenasDaPeca(playId),
+        listarIndisponibilidades(hoje),
+      ]);
+      return { cenas, avisos };
+    },
+    [aberto, playId, hoje],
+  );
+  const cenas = paraMarcar.dados?.cenas ?? [];
+  const avisos = useMemo(() => paraMarcar.dados?.avisos ?? [], [paraMarcar.dados]);
+
+  /** Quem avisou que não pode no dia escolhido, entre os convocados. */
+  const naoPodem = useMemo(() => {
+    if (!form.data) return [];
+    const doDia = quemNaoPodeEm(avisos, form.data);
+    const convocados = new Set(form.todos ? escalados.map((p) => p.personId) : form.convocados);
+    return doDia.filter((a) => convocados.has(a.personId));
+  }, [avisos, form.data, form.todos, form.convocados, escalados]);
+
+  function alternarTrecho(trecho: TrechoDaPeca) {
+    const chave = `${trecho.ato}-${trecho.cena}`;
+    const tem = form.trechos.some((t) => `${t.ato}-${t.cena}` === chave);
+    setAlteracoes({
+      ...form,
+      trechos: tem
+        ? form.trechos.filter((t) => `${t.ato}-${t.cena}` !== chave)
+        : [...form.trechos, trecho].sort((a, b) => a.ato - b.ato || a.cena - b.cena),
+    });
+  }
+
+  /**
+   * Convoca quem fala nos trechos escolhidos.
+   *
+   * Sem isto, marcar um ensaio de uma cena e chamar o elenco inteiro é o
+   * caminho mais curto — conferir no roteiro quem fala ali dá mais trabalho
+   * que chamar todos —, e aí quinze pessoas atravessam a cidade para assistir
+   * a três ensaiarem.
+   */
+  async function convocarPelosTrechos() {
+    if (!playId || form.trechos.length === 0) return;
+    await enviar(async () => {
+      const pessoas = await quemFalaNosTrechos(playId, form.trechos);
+      const noElenco = new Set(escalados.map((p) => p.personId));
+      setAlteracoes({
+        ...form,
+        todos: false,
+        convocados: pessoas.filter((id) => noElenco.has(id)),
+      });
+    });
+  }
 
   const visiveis = useMemo(
     () => (filtroPeca === "todas" ? ensaios : ensaios.filter((e) => e.playId === filtroPeca)),
@@ -213,12 +291,13 @@ function ConteudoEnsaios() {
   }
 
   async function salvar() {
+    const oQueE = ENCONTRO_TIPO_LABEL[form.tipo].toLowerCase();
     if (!playId) {
-      definirErro("Escolha a peça relacionada ao ensaio.");
+      definirErro(`Escolha a peça d${form.tipo === "ensaio" ? "o" : "a"} ${oQueE}.`);
       return;
     }
     if (!form.data) {
-      definirErro("Informe a data do ensaio.");
+      definirErro(`Informe a data d${form.tipo === "ensaio" ? "o" : "a"} ${oQueE}.`);
       return;
     }
     if (!form.horaInicio) {
@@ -234,6 +313,12 @@ function ConteudoEnsaios() {
     const conteudo = {
       playId,
       playTitulo: peca?.titulo ?? "",
+      tipo: form.tipo,
+      // Só apresentação carrega evento; ensaio com nome de evento confundiria
+      // a lista, que usa esse campo para dizer onde a peça subiu.
+      nomeEvento: form.tipo === "apresentacao" ? form.nomeEvento.trim() : "",
+      // Vazio significa "a peça inteira", e é o que uma apresentação sempre é.
+      trechos: form.tipo === "apresentacao" ? [] : form.trechos,
       data: form.data,
       horaInicio: form.horaInicio,
       horaFim: form.horaFim,
@@ -387,6 +472,39 @@ function ConteudoEnsaios() {
       >
         <div className="grid gap-5 min-[720px]:grid-cols-2">
           <div className="space-y-3.5">
+            <Campo
+              etiqueta="O que é"
+              dica="Apresentação usa a mesma convocação e a mesma confirmação de presença do ensaio."
+            >
+              <Selecao
+                value={form.tipo}
+                onChange={(e) =>
+                  setAlteracoes({
+                    ...form,
+                    tipo: e.target.value as EncontroTipo,
+                    // Apresentação é a peça inteira, sempre.
+                    trechos: e.target.value === "apresentacao" ? [] : form.trechos,
+                  })
+                }
+              >
+                {ENCONTRO_TIPOS.map((t) => (
+                  <option key={t} value={t}>
+                    {ENCONTRO_TIPO_LABEL[t]}
+                  </option>
+                ))}
+              </Selecao>
+            </Campo>
+
+            {form.tipo === "apresentacao" ? (
+              <Campo etiqueta="Evento" dica="Onde a peça sobe: “Culto de Natal”, “Congresso de Jovens”.">
+                <Entrada
+                  value={form.nomeEvento}
+                  onChange={(e) => setAlteracoes({ ...form, nomeEvento: e.target.value })}
+                  placeholder="Culto de Natal"
+                />
+              </Campo>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta="Data" obrigatorio>
                 <Entrada
@@ -455,6 +573,57 @@ function ConteudoEnsaios() {
           </div>
 
           <div>
+            {form.tipo === "ensaio" ? (
+              <div className="mb-4">
+                <Eyebrow>O que vai ser ensaiado</Eyebrow>
+                <p className="mt-1.5 mb-2.5 text-[13px] leading-5 text-ink-caption">
+                  {cenas.length === 0
+                    ? "O roteiro desta peça ainda não tem cenas publicadas."
+                    : form.trechos.length === 0
+                      ? "Nenhuma cena marcada — vale como ensaio da peça inteira."
+                      : `${pluralizar(form.trechos.length, "cena", "cenas")} de ${cenas.length}`}
+                </p>
+                {cenas.length > 0 ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {cenas.map((cena) => {
+                        const marcada = form.trechos.some(
+                          (t) => t.ato === cena.ato && t.cena === cena.cena,
+                        );
+                        return (
+                          <button
+                            key={`${cena.ato}-${cena.cena}`}
+                            type="button"
+                            onClick={() => alternarTrecho(cena)}
+                            aria-pressed={marcada}
+                            className={juntar(
+                              "rounded-full border px-2.5 py-1 text-[12px] leading-4 transition-colors",
+                              marcada
+                                ? "border-brand bg-brand font-medium text-brand-ink"
+                                : "border-stroke-frame text-ink-body hover:bg-surface-hover",
+                            )}
+                          >
+                            {cena.ato}·{cena.cena}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {form.trechos.length > 0 ? (
+                      <Botao
+                        variante="ghost"
+                        className="mt-2.5 h-8"
+                        onClick={() => void convocarPelosTrechos()}
+                        disabled={enviando}
+                      >
+                        Convocar quem fala nessas cenas
+                      </Botao>
+                    ) : null}
+                  </>
+                ) : null}
+                <Divisor className="my-3" />
+              </div>
+            ) : null}
+
             <div className="flex items-center justify-between gap-3">
               <Eyebrow>Convocação</Eyebrow>
               <button
@@ -492,6 +661,24 @@ function ConteudoEnsaios() {
                 Convocar todo o elenco
               </Caixa>
             </div>
+
+            {naoPodem.length > 0 ? (
+              <div className="mt-3">
+                <Aviso tom="aviso">
+                  {naoPodem.length === 1
+                    ? `${nomeCurto(naoPodem[0].personNome)} avisou que não pode neste dia`
+                    : `${naoPodem.length} convocados avisaram que não podem neste dia`}
+                  {naoPodem.some((a) => a.motivo) ? (
+                    <span className="mt-1 block text-[12px] leading-[18px]">
+                      {naoPodem
+                        .filter((a) => a.motivo)
+                        .map((a) => `${nomeCurto(a.personNome)}: ${a.motivo}`)
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                </Aviso>
+              </div>
+            ) : null}
 
             <Divisor className="my-3" />
 

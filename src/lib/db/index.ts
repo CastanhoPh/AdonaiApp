@@ -24,6 +24,7 @@ export * from "./pecas";
 export * from "./personagens";
 export * from "./roteiro";
 export * from "./ensaios";
+export * from "./indisponibilidades";
 export * from "./avisos";
 export * from "./presencas";
 export * from "./participacoes";

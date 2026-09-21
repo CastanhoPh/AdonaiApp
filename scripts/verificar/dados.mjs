@@ -32,6 +32,17 @@ export async function rodar() {
   const direcao = {};
   for (const d of (await db.collection("direcao").get()).docs) direcao[d.id] = d.data();
 
+  /* As cenas que cada roteiro tem, para conferir os trechos dos encontros. */
+  const falasPorPeca = new Map();
+  for (const peca of pecas) {
+    const cenas = new Set();
+    for (const f of (await db.collection("plays").doc(peca.id).collection("lines").get()).docs) {
+      const v = f.data();
+      cenas.add(`${v.ato}-${v.cena}`);
+    }
+    falasPorPeca.set(peca.id, cenas);
+  }
+
   const personagens = [];
   for (const peca of pecas) {
     for (const c of (await db.collection("plays").doc(peca.id).collection("characters").get()).docs) {
@@ -99,11 +110,37 @@ export async function rodar() {
     }
   }
 
-  const atuais = pecas.filter((p) => p.atual);
-  if (atuais.length > 1) {
-    anotar("alta", "peça atual", `${atuais.length} peças marcadas como atual — só pode haver uma`);
-  } else if (atuais.length === 0) {
-    anotar("média", "peça atual", "nenhuma peça é a atual: o elenco não vê personagem nem roteiro");
+  /*
+   * Mais de uma peça em cartaz deixou de ser erro — Natal e Páscoa em paralelo
+   * é o normal do grupo. O que continua sendo problema é nenhuma: aí o elenco
+   * abre o app e não vê personagem, roteiro nem ensaio.
+   */
+  const emCartaz = pecas.filter((p) => p.atual);
+  if (emCartaz.length === 0) {
+    anotar("média", "cartaz", "nenhuma peça em cartaz: o elenco não vê personagem nem roteiro");
+  }
+  for (const peca of emCartaz) {
+    if (["concluida", "arquivada"].includes(peca.status)) {
+      anotar("média", peca.titulo, "encerrada e ainda em cartaz para o elenco");
+    }
+  }
+
+  /* Encontros: apresentação sem evento, e trecho que não existe no roteiro. */
+  for (const e of ensaios) {
+    const peca = porPeca.get(e.playId);
+    if (!peca) {
+      anotar("alta", `encontro de ${e.data}`, "de uma peça que não existe");
+      continue;
+    }
+    if (e.tipo === "apresentacao" && !e.nomeEvento) {
+      anotar("baixa", `${peca.titulo} · ${e.data}`, "apresentação sem nome do evento");
+    }
+    for (const t of e.trechos ?? []) {
+      const existe = falasPorPeca.get(e.playId)?.has(`${t.ato}-${t.cena}`);
+      if (!existe) {
+        anotar("média", `${peca.titulo} · ${e.data}`, `marcado para o ato ${t.ato}, cena ${t.cena}, que não existe no roteiro`);
+      }
+    }
   }
 
   /* -------------------------------------- o que é pessoal ficou no lugar */
@@ -176,6 +213,17 @@ export async function rodar() {
   }
   for (const e of exercicios) {
     if (!e.youtubeUrl) anotar("média", e.nome ?? e.id, "exercício sem link de vídeo");
+  }
+
+  /* Avisos de indisponibilidade que apontam para quem não existe mais. */
+  for (const a of (await db.collection("indisponibilidades").get()).docs) {
+    const v = a.data();
+    if (!porPessoa.has(v.personId)) {
+      anotar("média", `indisponibilidade ${a.id}`, "de uma ficha que não existe");
+    }
+    if (v.de > v.ate) {
+      anotar("média", v.personNome ?? a.id, "aviso com o fim antes do começo");
+    }
   }
 
   /* ------------------------------------ características de quem não existe */

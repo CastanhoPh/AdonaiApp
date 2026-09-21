@@ -227,6 +227,39 @@ service cloud.firestore {
       }
     }
 
+    // ------------------------------------------- disponibilidade antecipada
+
+    /*
+     * Quando alguém avisa que não pode, antes de a direção marcar.
+     *
+     * Cada um escreve só o próprio aviso — o id da pessoa está no documento, e
+     * a regra confere contra o vínculo da conta. Poder marcar indisponível no
+     * nome de outro é poder tirar alguém de um ensaio sem que ele saiba.
+     *
+     * A leitura é da direção e da própria pessoa. O elenco inteiro não lê: o
+     * motivo é assunto de quem escreveu — "prova na faculdade", "consulta" —,
+     * e a agenda de todo mundo não é informação que o grupo precise.
+     */
+    match /indisponibilidades/{avisoId} {
+      function ehDaPropriaPessoa() {
+        return doGrupo() && conta().personId == resource.data.personId;
+      }
+
+      allow get, list: if ehAdmin() || ehDaPropriaPessoa();
+
+      // Na criação `resource` ainda não existe: confere o que está chegando.
+      allow create: if ehAdmin()
+        || (doGrupo()
+            && request.resource.data.personId == conta().personId
+            && request.resource.data.de <= request.resource.data.ate);
+
+      allow update: if ehAdmin()
+        || (ehDaPropriaPessoa()
+            && request.resource.data.personId == resource.data.personId);
+
+      allow delete: if ehAdmin() || ehDaPropriaPessoa();
+    }
+
     // ----------------------------------------------------------- avisos
 
     // Só a direção compõe e consulta os avisos. Quem entrega é o disparador,

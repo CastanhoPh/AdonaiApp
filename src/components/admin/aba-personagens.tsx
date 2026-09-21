@@ -20,6 +20,7 @@ import {
   Caixa,
   Campo,
   Cartao,
+  Divisor,
   Entrada,
   Modal,
   Selecao,
@@ -29,6 +30,7 @@ import {
   Vazio,
 } from "@/components/ui";
 import { EnviarFoto } from "@/components/comum/enviar-foto";
+import { FichaInterpretacao } from "./ficha-interpretacao";
 
 function personagemVazio() {
   return {
@@ -58,6 +60,10 @@ export function AbaPersonagens({
   const { enviando, erro, definirErro, enviar } = useEnvio();
   const [aberto, setAberto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  /* O personagem recarregado, para a ficha refletir o que foi gravado. */
+  const personagemEmEdicao = editandoId
+    ? (personagens.find((p) => p.id === editandoId) ?? null)
+    : null;
   const [form, setForm] = useState(personagemVazio());
   const [removendo, setRemovendo] = useState<Character | null>(null);
 
@@ -418,6 +424,24 @@ export function AbaPersonagens({
               </p>
             )}
           </Campo>
+          {/*
+            * A ficha de interpretação só na edição, e no fim.
+            *
+            * Depende do id, como a imagem — e é material de trabalho, não
+            * cadastro: quem está criando o personagem ainda está dizendo que
+            * ele existe, não quem ele é.
+            */}
+          {personagemEmEdicao ? (
+            <>
+              <Divisor className="my-1" />
+              <FichaInterpretacao
+                playId={playId}
+                personagem={personagemEmEdicao}
+                onSalvo={onAtualizar}
+              />
+            </>
+          ) : null}
+
           {erro ? <Aviso>{erro}</Aviso> : null}
         </div>
       </Modal>
