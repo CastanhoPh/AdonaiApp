@@ -20,7 +20,11 @@
  *   node scripts/migrar-caracteristicas.mjs --aplicar  executa
  */
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "tirou as características de `people` e `characters` e levou para `direcao/caracteristicas`");
 
 const aplicar = process.argv.includes("--aplicar");
 

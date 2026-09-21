@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowDown, ArrowUp, MagnifyingGlass, TextAa, X } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth-context";
 import { listarFalas } from "@/lib/db";
@@ -56,6 +56,72 @@ function agrupar(falas: ScriptLine[]): Ato[] {
 
 const TAMANHOS = ["0.9375rem", "1rem", "1.125rem", "1.25rem"];
 
+/**
+ * O tamanho escolhido fica no aparelho.
+ *
+ * É escolha de quem lê, não da conta: quem aumenta a letra faz isso por causa
+ * da luz do ensaio e do tamanho da tela daquele celular, não porque quer letra
+ * grande em todo lugar. Por isso `localStorage` e não a ficha.
+ *
+ * Sem isto a escolha durava até sair da tela — e o roteiro é justamente a tela
+ * que se abre e fecha o tempo todo durante um ensaio, refazendo o ajuste toda
+ * vez, no escuro.
+ */
+const CHAVE_DO_TAMANHO = "adonai:roteiro:tamanho";
+
+function tamanhoGuardado(): number {
+  if (typeof window === "undefined") return 1;
+  try {
+    const guardado = Number(window.localStorage.getItem(CHAVE_DO_TAMANHO));
+    return Number.isInteger(guardado) && guardado >= 0 && guardado < TAMANHOS.length
+      ? guardado
+      : 1;
+  } catch {
+    // Navegação privada ou armazenamento bloqueado: começa no padrão.
+    return 1;
+  }
+}
+
+/*
+ * Uma memória fora do React, com assinatura.
+ *
+ * `useState` mais `useEffect` seria o caminho curto e é proibido aqui: o
+ * compilador do React recusa `setState` dentro de efeito, e com razão — o
+ * primeiro desenho sairia com o padrão e o segundo com o guardado, piscando.
+ * Ler `localStorage` direto no estado inicial também não serve: o app é
+ * exportado estático, e o valor lido divergiria da pré-renderização, que é
+ * erro de hidratação.
+ *
+ * `useSyncExternalStore` resolve os dois: o React pergunta o valor na hora
+ * certa, e recebe 1 quando não há navegador.
+ */
+let escolhido: number | null = null;
+const ouvintes = new Set<() => void>();
+
+function lerTamanho(): number {
+  if (escolhido === null) escolhido = tamanhoGuardado();
+  return escolhido;
+}
+
+function assinarTamanho(avisar: () => void): () => void {
+  ouvintes.add(avisar);
+  return () => ouvintes.delete(avisar);
+}
+
+function noServidor(): number {
+  return 1;
+}
+
+function guardarTamanho(indice: number): void {
+  escolhido = indice;
+  try {
+    window.localStorage.setItem(CHAVE_DO_TAMANHO, String(indice));
+  } catch {
+    // Sem armazenamento a escolha vale só nesta sessão; não é motivo de erro.
+  }
+  ouvintes.forEach((avisar) => avisar());
+}
+
 export default function Roteiro() {
   const { pessoa } = useAuth();
   const atual = useAtual();
@@ -96,7 +162,7 @@ export default function Roteiro() {
   );
 
   const [indice, setIndice] = useState(-1);
-  const [tamanho, setTamanho] = useState(1);
+  const tamanho = useSyncExternalStore(assinarTamanho, lerTamanho, noServidor);
   const [menuAberto, setMenuAberto] = useState(false);
   const [buscaAberta, setBuscaAberta] = useState(false);
   const [busca, setBusca] = useState("");
@@ -239,7 +305,7 @@ export default function Roteiro() {
           <div className="flex items-center gap-1">
             <Botao
               variante="ghost"
-              onClick={() => setTamanho((t) => Math.max(0, t - 1))}
+              onClick={() => guardarTamanho(Math.max(0, tamanho - 1))}
               disabled={tamanho === 0}
               className="h-9 w-10 px-0"
             >
@@ -247,7 +313,7 @@ export default function Roteiro() {
             </Botao>
             <Botao
               variante="ghost"
-              onClick={() => setTamanho((t) => Math.min(TAMANHOS.length - 1, t + 1))}
+              onClick={() => guardarTamanho(Math.min(TAMANHOS.length - 1, tamanho + 1))}
               disabled={tamanho === TAMANHOS.length - 1}
               className="h-9 w-10 px-0 text-[16px]"
             >

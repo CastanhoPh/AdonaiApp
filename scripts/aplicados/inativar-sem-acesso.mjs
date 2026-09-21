@@ -14,7 +14,11 @@
  *   node scripts/inativar-sem-acesso.mjs            confere
  *   node scripts/inativar-sem-acesso.mjs --aplicar  grava
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "marcou como inativa quem entrou só pelo acervo");
 
 const aplicar = process.argv.includes("--aplicar");
 

@@ -220,8 +220,14 @@ Quem não autoriza a permissão continua vendo tudo pela aba Ensaios.
 O zoom está desligado dentro do app: `maximumScale`/`userScalable` no viewport,
 `touch-action: manipulation` contra o toque duplo e campos a 16px em telas de
 toque, que é o que evita o Safari ampliar sozinho ao focar um input. O Safari no
-iOS mantém a pinça por decisão de acessibilidade da Apple — para ler o roteiro
-com letra maior, use o controle de tamanho da própria tela.
+iOS mantém a pinça por decisão de acessibilidade da Apple.
+
+**Para ler o roteiro com letra maior há controle próprio**, no botão `Aa` da
+barra: quatro tamanhos, e a escolha fica guardada no aparelho. Num app cujo uso
+principal é ler texto no ensaio, isso não podia depender do ajuste do sistema —
+e a escolha não podia durar até sair da tela, que é justamente o que se faz o
+tempo todo durante um ensaio. Fica no aparelho e não na conta porque depende da
+luz do lugar e do tamanho daquela tela, não da pessoa.
 
 ### Prévia ao compartilhar o link
 
@@ -447,7 +453,7 @@ src/
     admin/                         abas da tela de peça e o convite da pessoa
   lib/
     types.ts                       modelo de dados
-    db.ts                          acesso ao Firestore e regras de negócio
+    db/                            acesso ao Firestore, um módulo por assunto
     auth-context.tsx               sessão, cadastro e vínculo com a pessoa
     armazenamento.ts               envio de imagem, caminhos e miniaturas
     convite.ts  funcoes.ts         código do convite e chamada das functions
@@ -464,21 +470,52 @@ scripts/
   convite.mjs                      gera o convite de alguém do cadastro
   seed.mjs                         características iniciais
   subir-acervo.mjs                 peças antigas, elenco e direção, em lote
-  enviar-avisos.mjs                entrega manual dos avisos pendentes
   gerar-miniaturas.mjs             versão pequena das imagens que já estão lá
+  sincronizar-claims.mjs           reescreve as claims a partir de `users`
   corrigir-segmentos.mjs           roda no build, ver Publicação
+  aplicados/                       já rodaram uma vez; travados contra repetição
 design/                            handoff de design (HANDOFF.md + tokens)
 public/                            marca do Aliança, ícones, manifesto, sw.js
 ```
 
-Os demais scripts são de manutenção pontual — migração de dado, correção de
-cadastro, renomeação de arquivo no Storage. Cada um explica no próprio
-cabeçalho o que faz e quando foi preciso, e todos conferem antes de gravar:
-sem `--aplicar` eles só mostram o que fariam.
+**`scripts/aplicados/` é história, não ferramenta.** São os 14 que rodaram uma
+vez contra a produção — migrações de dado, correções de cadastro, carga do
+acervo — e que o banco hoje já deixou para trás. Ficam no repositório porque
+contam o que foi feito no dado e por quê; o banco é o resultado deles, e sem o
+código não dá para reconstruir o raciocínio meses depois.
+
+Cada um recusa rodar, dizendo o que fez e quando. Rodar de novo vai de inócuo a
+destrutivo conforme o caso: `mover-email` procuraria um campo que não existe
+mais, mas `corrigir-papeis` reescreveria escalação que a direção ajustou à mão
+depois. Para insistir, `ADONAI_RODAR_DE_NOVO=1` — e um `npm run backup` antes.
+
+Os que ficaram em `scripts/` conferem antes de gravar: sem `--aplicar` só
+mostram o que fariam.
 
 A chave da conta de serviço **não** fica no projeto: o caminho dela é apontado
 por `GOOGLE_APPLICATION_CREDENTIALS` no `.env.local`. Guarde o arquivo fora de
 pasta sincronizada — esta aqui está no OneDrive.
+
+## Onde mora o acesso ao banco
+
+`src/lib/db/` tem um módulo por assunto — `pessoas`, `pecas`, `roteiro`,
+`ensaios`, `convites`, e assim por diante — e `index.ts` reexporta todos, então
+as telas continuam importando de `@/lib/db` e nenhuma precisou mudar quando a
+divisão aconteceu.
+
+Era um arquivo de 1.309 linhas. Cresceu assim porque tudo que fala com o banco
+tinha um lugar óbvio para ir e nenhum momento óbvio para parar.
+
+A divisão é **por assunto, não por camada**: quem vai mexer em roteiro abre
+`roteiro.ts`, não "os repositórios". Regra que envolve mais de uma coleção fica
+no módulo de quem manda — concluir peça é de `pecas.ts`, mesmo escrevendo em
+`participations`.
+
+`firestore.ts` guarda as três decisões que valem para todos: consulta de
+coleção sempre vai ao servidor, documento único pode vir do disco, e contagem
+não traz documento nenhum. Os módulos falam com ele, não com o SDK — decisão
+que cada um pudesse repetir por conta própria vira convenção que alguém
+esquece. Ele fica de fora do `index.ts`: é interno.
 
 ## Modelo de dados (Firestore)
 
@@ -626,12 +663,10 @@ Ela **cria o aviso** em vez de enviar direto, para o lembrete aparecer no
 histórico da tela de Avisos como qualquer outro e a entrega continuar sendo de
 uma função só. O campo `lembreteEm` no ensaio é a trava contra repetição.
 
-O mesmo disparador existe como script, para reenvio manual e para depurar:
-
-```bash
-npm run avisos           # envia os pendentes
-npm run avisos -- --dry  # só mostra quem receberia
-```
+**Há um caminho só.** Existia também `scripts/enviar-avisos.mjs`, que era uma
+segunda implementação da mesma entrega — 182 linhas contra 161, com os mesmos
+nomes de função. Duas cópias da mesma lógica não são dois caminhos: são um
+caminho e uma divergência esperando acontecer. O script foi aposentado.
 
 O aparelho entra na lista de destinatários quando a pessoa autoriza os avisos —
 o token vai para `users/{uid}.tokensFcm` e é reconfirmado a cada abertura do
@@ -862,7 +897,6 @@ para reposição com o token original.
 | `npm run convite`   | gera o convite de primeiro acesso de alguém      |
 | `npm run seed`      | cadastra as características iniciais             |
 | `npm run acervo`    | sobe peças antigas, elenco e direção em lote     |
-| `npm run avisos`    | entrega os avisos pendentes (`-- --dry` simula)  |
 | `npm run claims`    | ressincroniza as claims de todas as contas       |
 | `npm run miniaturas` | gera a versão pequena das imagens que não têm   |
 

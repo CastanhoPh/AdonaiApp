@@ -15,7 +15,11 @@
  *   node scripts/corrigir-papeis.mjs            confere
  *   node scripts/corrigir-papeis.mjs --aplicar  grava
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "corrigiu tipo e escalação de personagens do acervo");
 
 const CORRECOES = [
   {

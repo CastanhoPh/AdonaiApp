@@ -143,9 +143,23 @@ async function oQueATelaBaixa(navegador, sessao, rota) {
   const baixadas = [];
   pagina.on("response", async (resposta) => {
     if (!resposta.url().includes("firebasestorage")) return;
+    /*
+     * Só download de arquivo que chegou até o fim.
+     *
+     * Requisição cancelada — o teste rola a página depressa, e o navegador
+     * desiste do que saiu da tela — chega aqui sem corpo e com endereço que
+     * não dá para decompor. O nome saía vazio, vazio não termina em `-mini`, e
+     * a verificação acusava "baixou a imagem grande de " com o nome em branco.
+     * Teste que acusa sozinho é pior que teste nenhum: ensina a ignorar.
+     */
+    if (resposta.status() !== 200) return;
+    const depoisDoO = resposta.url().split("/o/")[1];
+    if (!depoisDoO) return;
     const corpo = await resposta.body().catch(() => null);
-    const caminho = decodeURIComponent(resposta.url().split("/o/")[1]?.split("?")[0] ?? "");
-    baixadas.push({ nome: caminho.split("/").pop(), kb: corpo ? Math.round(corpo.length / 1024) : 0 });
+    if (!corpo) return;
+    const nome = decodeURIComponent(depoisDoO.split("?")[0]).split("/").pop();
+    if (!nome) return;
+    baixadas.push({ nome, kb: Math.round(corpo.length / 1024) });
   });
 
   await pagina.goto(SITE + rota, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});

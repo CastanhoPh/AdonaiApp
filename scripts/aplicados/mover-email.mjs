@@ -20,7 +20,11 @@
  *   node scripts/mover-email.mjs --aplicar  grava
  */
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "tirou o e-mail da ficha pública");
 
 const aplicar = process.argv.includes("--aplicar");
 console.log(`\n${aplicar ? "APLICANDO" : "CONFERINDO (nada será escrito)"}\n`);

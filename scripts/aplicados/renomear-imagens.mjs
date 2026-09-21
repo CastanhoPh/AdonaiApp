@@ -28,6 +28,10 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "pôs o nome de quem é a imagem no nome do arquivo");
+
 function lerEnv(arquivo) {
   const valores = {};
   for (const linha of readFileSync(resolve(arquivo), "utf8").split(/\r?\n/)) {

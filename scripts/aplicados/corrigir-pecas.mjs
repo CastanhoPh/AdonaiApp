@@ -13,7 +13,11 @@
  *   node scripts/corrigir-pecas.mjs            confere
  *   node scripts/corrigir-pecas.mjs --aplicar  grava
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "corrigiu título, evento e data de peças do acervo");
 
 /**
  * `campo` é o que muda; `de` é o valor que precisa estar lá hoje.

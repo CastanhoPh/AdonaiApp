@@ -16,7 +16,11 @@
  * receberia, sem enviar nada.
  */
 import { getMessaging } from "firebase-admin/messaging";
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "entregava os avisos pendentes — hoje quem entrega é a Cloud Function `entregarAviso`, que dispara sozinha na criação do aviso");
 
 const seco = process.argv.includes("--dry");
 

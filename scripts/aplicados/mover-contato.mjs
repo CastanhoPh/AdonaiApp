@@ -15,7 +15,11 @@
  *   node scripts/mover-contato.mjs --aplicar  grava
  */
 import { FieldValue } from "firebase-admin/firestore";
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "tirou telefone, nascimento e responsável da ficha pública");
 
 const CAMPOS = ["telefone", "nascimento", "responsavelNome", "responsavelTelefone"];
 

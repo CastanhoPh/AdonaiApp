@@ -11,7 +11,11 @@
  *   node scripts/alinhar-nomes.mjs            confere
  *   node scripts/alinhar-nomes.mjs --aplicar  grava
  */
-import { auth, db } from "./firebase-admin-app.mjs";
+import { auth, db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "trocou nomes provisórios (a parte antes do @) pelo nome real");
 
 const aplicar = process.argv.includes("--aplicar");
 const ehPlaceholder = (nome, email) => !nome || nome === String(email).split("@")[0];

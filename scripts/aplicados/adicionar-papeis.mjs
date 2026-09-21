@@ -19,7 +19,11 @@
  *   node scripts/adicionar-papeis.mjs            confere
  *   node scripts/adicionar-papeis.mjs --aplicar  grava
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "acrescentou papéis que faltavam em peças do acervo");
 
 const TIPO = {
   Principal: "protagonista",

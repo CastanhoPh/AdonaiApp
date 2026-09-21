@@ -15,7 +15,11 @@
  *   node scripts/subir-elenco.mjs
  *   node scripts/subir-elenco.mjs --aplicar
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "criou as fichas do elenco a partir da lista do grupo");
 
 /*
  * Como os rótulos da lista viram tipo de papel no app.

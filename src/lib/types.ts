@@ -48,9 +48,10 @@ export const AVISO_ALVO_LABEL: Record<AvisoAlvo, string> = {
 /**
  * Aviso disparado pela direção. Documento em `avisos/{avisoId}`.
  *
- * A direção grava o aviso como pendente e quem entrega é o disparador
- * (`scripts/enviar-avisos.mjs`): mandar push exige credencial de servidor, que
- * não pode ficar no navegador.
+ * A direção grava o aviso como pendente e a entrega acontece fora do
+ * navegador: mandar push exige credencial de servidor. Quem entrega é a Cloud
+ * Function `entregarAviso`, que dispara na criação do documento e escreve aqui
+ * o resultado — `status`, `enviadoEm`, `entregues` e `detalhe` são dela.
  */
 export interface Aviso {
   id: string;

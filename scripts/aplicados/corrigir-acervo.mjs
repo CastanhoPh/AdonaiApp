@@ -13,7 +13,11 @@
  *   node scripts/corrigir-acervo.mjs
  *   node scripts/corrigir-acervo.mjs --aplicar
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "corrigiu dados das peças carregadas em lote");
 
 /*
  * Nomes que entraram errados por causa das listas anteriores, corrigidos pela

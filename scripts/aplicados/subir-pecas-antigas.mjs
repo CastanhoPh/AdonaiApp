@@ -15,7 +15,11 @@
  *   node scripts/subir-pecas-antigas.mjs
  *   node scripts/subir-pecas-antigas.mjs --aplicar
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "criou as peças anteriores ao app");
 
 /*
  * Lista como recebida, na ordem em que foi passada.

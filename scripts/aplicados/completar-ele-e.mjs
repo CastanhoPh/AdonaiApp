@@ -15,7 +15,11 @@
  *   node scripts/completar-ele-e.mjs            confere
  *   node scripts/completar-ele-e.mjs --aplicar  grava
  */
-import { db } from "./firebase-admin-app.mjs";
+import { db } from "../firebase-admin-app.mjs";
+
+import { jaRodou } from "./ja-rodou.mjs";
+
+jaRodou("", "completou o elenco da peça \"Ele É\"");
 
 const TIPO = {
   Principal: "protagonista",
